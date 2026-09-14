@@ -170,7 +170,24 @@ def save_user_config(config: OptimizerConfig) -> None:
             json.dump(user_data, f, indent=2)
     except Exception as e:
         print(f"Failed to save user config: {e}")
+import hashlib
 
+def get_config_hash(config: OptimizerConfig) -> str:
+    """Generate a hash representing the user-configurable optimization parameters."""
+    keys = [
+        "convert_heic_to_jpeg",
+        "preserve_metadata",
+        "jpeg_quality",
+        "image_max_dimension",
+        "video_max_height",
+        "video_max_fps"
+    ]
+    try:
+        user_data = {k: getattr(config, k) for k in keys if hasattr(config, k)}
+        s = json.dumps(user_data, sort_keys=True)
+        return hashlib.md5(s.encode()).hexdigest()
+    except Exception:
+        return ""
 def get_default_config() -> OptimizerConfig:
     """Generate default configuration tuned for the current Mac, and apply user settings."""
     hw = detect_hardware()

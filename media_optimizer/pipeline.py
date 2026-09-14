@@ -219,22 +219,25 @@ class OptimizationPipeline:
                 on_progress(0, 0, "No media files", 0, 0, 0, "No media files found")
             return summary
 
-        # Filter out already completed files
-        pending_tasks: List[TaskItem] = []
-        skipped_already_done = 0
+        from media_optimizer.config import get_config_hash
+        config_hash = get_config_hash(self.config)
 
+        # Filter out already completed tasks
+        pending_tasks = []
+        skipped_already_done = 0
         for t in tasks:
-            if journal.is_already_done(t.rel_path, t.mtime, t.size_bytes, t.dst_path):
+            if journal.is_already_done(t, config_hash, output_dir):
                 skipped_already_done += 1
             else:
                 pending_tasks.append(t)
 
+        tasks = pending_tasks
+        
         if skipped_already_done > 0:
-            emit_activity(f"Resuming batch: {skipped_already_done} files already completed, {len(pending_tasks)} remaining.", "info")
+            emit_activity(f"Skipped {skipped_already_done} files (already optimized with identical config).", "info")
 
-        if not pending_tasks:
+        if not tasks:
             summary = journal.get_summary()
-            emit_activity("All files are already up-to-date and optimized!", "complete")
             if on_progress:
                 on_progress(
                     total_items,
@@ -243,7 +246,7 @@ class OptimizationPipeline:
                     summary.original_bytes,
                     summary.optimized_bytes,
                     summary.saved_bytes,
-                    "All files already completed",
+                    "All files already completed with current config",
                 )
             return summary
 
@@ -307,6 +310,22 @@ class OptimizationPipeline:
                 media_type = task.media_type
                 plan = None
 
+            # Resolve filename collisions: if destination exists (and isn't the source itself),
+            # append a numeric suffix to avoid overwriting existing files.
+            original_dst = task.dst_path
+            counter = 1
+            while task.dst_path.exists() and task.dst_path.resolve() != task.src_path.resolve():
+                task.dst_path = original_dst.with_name(f"{original_dst.stem}_{counter}{original_dst.suffix}")
+                counter += 1
+            
+            # Update relative path if we changed the destination name
+            if task.dst_path != original_dst:
+                if rel_p.endswith(original_dst.name):
+                    rel_p = rel_p[:-len(original_dst.name)] + task.dst_path.name
+                else:
+                    rel_p = str(task.dst_path.relative_to(output_dir))
+                task.rel_path = rel_p
+
             if on_item_start:
                 try:
                     on_item_start(rel_p, orig_sz, plan_reason)
@@ -348,19 +367,19 @@ class OptimizationPipeline:
                 # 3. Record in journal
                 if success:
                     if plan and plan.action == DecisionAction.OPTIMIZE and final_sz < orig_sz:
-                        journal.record_completed(rel_p, orig_sz, final_sz, mtime, msg)
+                        journal.record_completed(rel_p, orig_sz, final_sz, mtime, msg, config_hash, str(task.src_path.resolve()))
                         act_level = "saved"
                     else:
-                        journal.record_skipped(rel_p, orig_sz, final_sz, mtime, msg)
+                        journal.record_skipped(rel_p, orig_sz, mtime, msg, config_hash, str(task.src_path.resolve()))
                         act_level = "copied"
                 else:
-                    journal.record_failed(rel_p, orig_sz, mtime, msg)
+                    journal.record_failed(rel_p, orig_sz, mtime, msg, config_hash, str(task.src_path.resolve()))
                     act_level = "error"
 
             except Exception as e:
                 msg = f"Failed: {e}"
                 final_sz = orig_sz
-                journal.record_failed(rel_p, orig_sz, mtime, msg)
+                journal.record_failed(rel_p, orig_sz, mtime, msg, config_hash, str(task.src_path.resolve()))
                 act_level = "error"
 
             with active_lock:

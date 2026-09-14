@@ -76,67 +76,79 @@ class Journal:
                         updated_at REAL NOT NULL
                     );
                 """)
+                try:
+                    conn.execute("ALTER TABLE tasks ADD COLUMN config_hash TEXT DEFAULT ''")
+                except sqlite3.OperationalError:
+                    pass
+                try:
+                    conn.execute("ALTER TABLE tasks ADD COLUMN src_path TEXT DEFAULT ''")
+                except sqlite3.OperationalError:
+                    pass
                 conn.commit()
 
-    def is_already_done(self, rel_path: str, current_mtime: float, current_size: int, dest_file: Path) -> bool:
-        """Check if file has already been successfully processed and unchanged."""
-        target_file = dest_file
-        if not target_file.exists():
-            # Check if a non-mp4 video was converted to .mp4
-            alt_mp4 = dest_file.with_suffix(".mp4")
-            if alt_mp4.exists():
-                target_file = alt_mp4
-            else:
-                return False
-
-        if target_file.stat().st_size == 0:
-            return False
-
+    def is_already_done(self, task: Any, config_hash: str, output_dir: Path) -> bool:
+        """Check if file has already been successfully processed with this config."""
+        src_path_str = str(task.src_path.resolve())
         with self._lock:
             with self._get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute(
-                    "SELECT status, orig_mtime, orig_size FROM tasks WHERE rel_path = ?",
-                    (rel_path,)
+                    "SELECT status, rel_path FROM tasks WHERE src_path = ? AND config_hash = ?",
+                    (src_path_str, config_hash)
                 )
                 row = cur.fetchone()
                 if not row:
                     return False
-                status, prev_mtime, prev_size = row
+                
+                status, saved_rel_path = row
                 if status in ("COMPLETED", "SKIPPED"):
-                    # Check if file has been modified since previous run
-                    if abs(prev_mtime - current_mtime) < 0.001 and prev_size == current_size:
+                    dest_file = output_dir / saved_rel_path
+                    if not dest_file.exists():
+                        alt_mp4 = dest_file.with_suffix(".mp4")
+                        if alt_mp4.exists():
+                            dest_file = alt_mp4
+                        else:
+                            return False
+                    
+                    if dest_file.stat().st_size > 0:
                         return True
         return False
+        
+    def has_record(self, rel_path: str) -> bool:
+        with self._lock:
+            with self._get_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT 1 FROM tasks WHERE rel_path = ?", (rel_path,))
+                return cur.fetchone() is not None
 
-    def record_completed(self, rel_path: str, orig_size: int, opt_size: int, mtime: float, reason: str) -> None:
+    def record_completed(self, rel_path: str, orig_size: int, opt_size: int, mtime: float, reason: str, config_hash: str, src_path: str) -> None:
         with self._lock:
             with self._get_connection() as conn:
                 conn.execute("""
                     INSERT OR REPLACE INTO tasks 
-                    (rel_path, orig_size, opt_size, status, orig_mtime, reason, error_msg, updated_at)
-                    VALUES (?, ?, ?, 'COMPLETED', ?, ?, NULL, ?)
-                """, (rel_path, orig_size, opt_size, mtime, reason, time.time()))
+                    (rel_path, orig_size, opt_size, status, orig_mtime, reason, error_msg, updated_at, config_hash, src_path)
+                    VALUES (?, ?, ?, 'COMPLETED', ?, ?, NULL, ?, ?, ?)
+                """, (rel_path, orig_size, opt_size, mtime, reason, time.time(), config_hash, src_path))
                 conn.commit()
 
-    def record_skipped(self, rel_path: str, orig_size: int, opt_size: int, mtime: float, reason: str) -> None:
+    def record_skipped(self, rel_path: str, orig_size: int, mtime: float, reason: str, config_hash: str, src_path: str) -> None:
         with self._lock:
             with self._get_connection() as conn:
                 conn.execute("""
                     INSERT OR REPLACE INTO tasks 
-                    (rel_path, orig_size, opt_size, status, orig_mtime, reason, error_msg, updated_at)
-                    VALUES (?, ?, ?, 'SKIPPED', ?, ?, NULL, ?)
-                """, (rel_path, orig_size, opt_size, mtime, reason, time.time()))
+                    (rel_path, orig_size, opt_size, status, orig_mtime, reason, error_msg, updated_at, config_hash, src_path)
+                    VALUES (?, ?, ?, 'SKIPPED', ?, ?, NULL, ?, ?, ?)
+                """, (rel_path, orig_size, orig_size, mtime, reason, time.time(), config_hash, src_path))
                 conn.commit()
 
-    def record_failed(self, rel_path: str, orig_size: int, mtime: float, error_msg: str) -> None:
+    def record_failed(self, rel_path: str, orig_size: int, mtime: float, error_msg: str, config_hash: str, src_path: str) -> None:
         with self._lock:
             with self._get_connection() as conn:
                 conn.execute("""
                     INSERT OR REPLACE INTO tasks 
-                    (rel_path, orig_size, opt_size, status, orig_mtime, reason, error_msg, updated_at)
-                    VALUES (?, ?, ?, 'FAILED', ?, NULL, ?, ?)
-                """, (rel_path, orig_size, orig_size, mtime, error_msg, time.time()))
+                    (rel_path, orig_size, opt_size, status, orig_mtime, reason, error_msg, updated_at, config_hash, src_path)
+                    VALUES (?, ?, 0, 'FAILED', ?, NULL, ?, ?, ?, ?)
+                """, (rel_path, orig_size, mtime, error_msg, time.time(), config_hash, src_path))
                 conn.commit()
 
     def get_summary(self) -> BatchSummary:
