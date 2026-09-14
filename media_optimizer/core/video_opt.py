@@ -168,9 +168,10 @@ def optimize_video(
             copy_metadata(src, final_dst, config.hardware.exiftool_path)
         preserve_timestamps(src, final_dst)
 
-        saved_bytes = orig_size - new_size
-        pct = (saved_bytes / orig_size) * 100.0
-        return True, new_size, f"Optimized {orig_size / (1024*1024):.1f}MB -> {new_size / (1024*1024):.1f}MB (-{pct:.1f}%)"
+        final_size = final_dst.stat().st_size
+        saved_bytes = orig_size - final_size
+        pct = (saved_bytes / orig_size) * 100.0 if orig_size > 0 else 0.0
+        return True, final_size, f"Optimized {orig_size / (1024*1024):.1f}MB -> {final_size / (1024*1024):.1f}MB (-{pct:.1f}%)"
 
     except Exception as e:
         if temp_dst.exists():
@@ -213,8 +214,9 @@ def _fallback_software_transcode(
                 if config.preserve_metadata:
                     copy_metadata(src, dst, config.hardware.exiftool_path)
                 preserve_timestamps(src, dst)
-                pct = ((orig_size - new_size) / orig_size) * 100.0
-                return True, new_size, f"Optimized (CPU fallback) -{pct:.1f}%"
+                final_size = dst.stat().st_size
+                pct = ((orig_size - final_size) / orig_size) * 100.0 if orig_size > 0 else 0.0
+                return True, final_size, f"Optimized (CPU fallback) -{pct:.1f}%"
 
         if temp_dst.exists():
             temp_dst.unlink()

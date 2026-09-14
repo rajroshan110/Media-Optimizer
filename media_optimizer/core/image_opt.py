@@ -74,10 +74,12 @@ def optimize_image(
         preserve_timestamps(src, dst)
         if use_sips and config.preserve_metadata and config.hardware.exiftool_path:
             copy_metadata(src, dst, config.hardware.exiftool_path)
+            preserve_timestamps(src, dst)
 
-        saved_bytes = orig_size - new_size
-        pct = (saved_bytes / orig_size) * 100.0
-        return True, new_size, f"Optimized {orig_size / 1024:.1f}KB -> {new_size / 1024:.1f}KB (-{pct:.1f}%)"
+        final_size = dst.stat().st_size
+        saved_bytes = orig_size - final_size
+        pct = (saved_bytes / orig_size) * 100.0 if orig_size > 0 else 0.0
+        return True, final_size, f"Optimized {orig_size / 1024:.1f}KB -> {final_size / 1024:.1f}KB (-{pct:.1f}%)"
 
     except Exception as e:
         if temp_dst.exists():

@@ -219,22 +219,50 @@ class OptimizationPipeline:
                 on_progress(0, 0, "No media files", 0, 0, 0, "No media files found")
             return summary
 
-        # Filter out already completed files
-        pending_tasks: List[TaskItem] = []
+        from media_optimizer.config import get_config_hash
+        config_hash = get_config_hash(self.config)
+
+        # Filter out already completed tasks for THIS BATCH
+        pending_tasks = []
         skipped_already_done = 0
+        batch_completed = 0
+        batch_skipped = 0
+        batch_orig_bytes = 0
+        batch_opt_bytes = 0
 
         for t in tasks:
-            if journal.is_already_done(t.rel_path, t.mtime, t.size_bytes, t.dst_path):
+            done_info = journal.is_already_done(t, config_hash, output_dir)
+            if done_info is not None:
+                status, o_sz, opt_sz = done_info
                 skipped_already_done += 1
+                if status == "COMPLETED":
+                    batch_completed += 1
+                else:
+                    batch_skipped += 1
+                batch_orig_bytes += o_sz
+                batch_opt_bytes += opt_sz
             else:
                 pending_tasks.append(t)
 
+        tasks = pending_tasks
+        
         if skipped_already_done > 0:
-            emit_activity(f"Resuming batch: {skipped_already_done} files already completed, {len(pending_tasks)} remaining.", "info")
+            emit_activity(f"Skipped {skipped_already_done} files (already optimized with identical config).", "info")
 
-        if not pending_tasks:
-            summary = journal.get_summary()
-            emit_activity("All files are already up-to-date and optimized!", "complete")
+        if not tasks:
+            from media_optimizer.core.journal import BatchSummary
+            saved = max(0, batch_orig_bytes - batch_opt_bytes)
+            pct = (saved / batch_orig_bytes * 100.0) if batch_orig_bytes > 0 else 0.0
+            summary = BatchSummary(
+                total_files=total_items,
+                completed=batch_completed,
+                skipped=batch_skipped,
+                failed=0,
+                original_bytes=batch_orig_bytes,
+                optimized_bytes=batch_opt_bytes,
+                saved_bytes=saved,
+                reduction_percent=pct,
+            )
             if on_progress:
                 on_progress(
                     total_items,
@@ -243,20 +271,17 @@ class OptimizationPipeline:
                     summary.original_bytes,
                     summary.optimized_bytes,
                     summary.saved_bytes,
-                    "All files already completed",
+                    "All files already completed with current config",
                 )
             return summary
 
         processed_counter = skipped_already_done
+        current_completed = batch_completed
+        current_skipped = batch_skipped
+        current_failed = 0
+        current_orig_bytes = batch_orig_bytes
+        current_opt_bytes = batch_opt_bytes
         counter_lock = threading.Lock()
-        
-        # In-memory counters for performance
-        initial_summary = journal.get_summary()
-        current_completed = initial_summary.completed
-        current_skipped = initial_summary.skipped
-        current_failed = initial_summary.failed
-        current_orig_bytes = initial_summary.original_bytes
-        current_opt_bytes = initial_summary.optimized_bytes
         
         active_files: set = set()
         active_lock = threading.Lock()
@@ -307,6 +332,27 @@ class OptimizationPipeline:
                 media_type = task.media_type
                 plan = None
 
+            # Resolve filename collisions
+            original_dst = task.dst_path
+            if self.config.overwrite_existing:
+                # Still protect the source file from being destroyed
+                if task.dst_path.exists() and task.dst_path.resolve() == task.src_path.resolve():
+                    task.dst_path = original_dst.with_name(f"{original_dst.stem}_optimized{original_dst.suffix}")
+            else:
+                # Keep both by appending a numeric suffix
+                counter = 1
+                while task.dst_path.exists() and task.dst_path.resolve() != task.src_path.resolve():
+                    task.dst_path = original_dst.with_name(f"{original_dst.stem}_{counter}{original_dst.suffix}")
+                    counter += 1
+            
+            # Update relative path if we changed the destination name
+            if task.dst_path != original_dst:
+                if rel_p.endswith(original_dst.name):
+                    rel_p = rel_p[:-len(original_dst.name)] + task.dst_path.name
+                else:
+                    rel_p = str(task.dst_path.relative_to(output_dir))
+                task.rel_path = rel_p
+
             if on_item_start:
                 try:
                     on_item_start(rel_p, orig_sz, plan_reason)
@@ -348,19 +394,19 @@ class OptimizationPipeline:
                 # 3. Record in journal
                 if success:
                     if plan and plan.action == DecisionAction.OPTIMIZE and final_sz < orig_sz:
-                        journal.record_completed(rel_p, orig_sz, final_sz, mtime, msg)
+                        journal.record_completed(rel_p, orig_sz, final_sz, mtime, msg, config_hash, str(task.src_path.resolve()))
                         act_level = "saved"
                     else:
-                        journal.record_skipped(rel_p, orig_sz, final_sz, mtime, msg)
+                        journal.record_skipped(rel_p, orig_sz, mtime, msg, config_hash, str(task.src_path.resolve()))
                         act_level = "copied"
                 else:
-                    journal.record_failed(rel_p, orig_sz, mtime, msg)
+                    journal.record_failed(rel_p, orig_sz, mtime, msg, config_hash, str(task.src_path.resolve()))
                     act_level = "error"
 
             except Exception as e:
                 msg = f"Failed: {e}"
                 final_sz = orig_sz
-                journal.record_failed(rel_p, orig_sz, mtime, msg)
+                journal.record_failed(rel_p, orig_sz, mtime, msg, config_hash, str(task.src_path.resolve()))
                 act_level = "error"
 
             with active_lock:
@@ -405,14 +451,14 @@ class OptimizationPipeline:
 
         # Notify initial progress state
         if on_progress and skipped_already_done > 0:
-            summary = journal.get_summary()
+            saved = max(0, batch_orig_bytes - batch_opt_bytes)
             on_progress(
                 skipped_already_done,
                 total_items,
                 "Resumed batch",
-                summary.original_bytes,
-                summary.optimized_bytes,
-                summary.saved_bytes,
+                batch_orig_bytes,
+                batch_opt_bytes,
+                saved,
                 f"Skipped {skipped_already_done} previously completed files",
             )
 
@@ -442,7 +488,19 @@ class OptimizationPipeline:
             image_executor.shutdown(wait=True)
             video_executor.shutdown(wait=True)
 
-        final_summary = journal.get_summary()
+        from media_optimizer.core.journal import BatchSummary
+        saved = max(0, current_orig_bytes - current_opt_bytes)
+        pct = (saved / current_orig_bytes * 100.0) if current_orig_bytes > 0 else 0.0
+        final_summary = BatchSummary(
+            total_files=total_items,
+            completed=current_completed,
+            skipped=current_skipped,
+            failed=current_failed,
+            original_bytes=current_orig_bytes,
+            optimized_bytes=current_opt_bytes,
+            saved_bytes=saved,
+            reduction_percent=pct,
+        )
         emit_activity(
             f"Batch completed! Processed: {final_summary.completed} optimized, {final_summary.skipped} preserved, {final_summary.failed} failed. Space saved: {format_bytes(final_summary.saved_bytes)} ({final_summary.reduction_percent:.1f}% reduction).",
             "complete",
