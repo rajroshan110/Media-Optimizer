@@ -35,6 +35,7 @@ class OptimizerConfig:
     profile: str = "whatsapp"
 
     # Image optimization thresholds & parameters (WhatsApp sweet spot: max 2048px HD, quality ~80)
+    convert_heic_to_jpeg: bool = True       # By default convert HEIC to JPEG for compatibility
     image_min_size_bytes: int = 250 * 1024  # Don't re-encode images under 250 KB unless oversized
     image_min_bpp_to_optimize: float = 1.3   # Bits per pixel threshold
     image_max_dimension: int = 2048          # WhatsApp HD max dimension (longest side)
@@ -143,7 +144,7 @@ def get_default_config() -> OptimizerConfig:
     # Determine concurrency
     # Video transcoding uses hardware encoder or 100% CPU thread, keep workers conservative
     if hw.is_apple_silicon:
-        video_workers = 2 if hw.cpu_cores >= 8 else 1
+        video_workers = 3 if hw.cpu_cores >= 8 else 2 if hw.cpu_cores >= 6 else 1
         image_workers = min(8, max(2, hw.cpu_cores // 2))
     else:
         video_workers = 1

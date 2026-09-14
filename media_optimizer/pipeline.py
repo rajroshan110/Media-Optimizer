@@ -183,6 +183,14 @@ class OptimizationPipeline:
         self._stop_requested.clear()
         output_dir = Path(output_dir).resolve()
         output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Clean up any temporary files left from previous crashes
+        try:
+            for tmp_file in output_dir.glob("**/*.tmp.*"):
+                if tmp_file.is_file():
+                    tmp_file.unlink()
+        except Exception:
+            pass
 
         def emit_activity(msg: str, level: str = "info") -> None:
             if on_activity:
@@ -275,6 +283,25 @@ class OptimizationPipeline:
             try:
                 media_type, info, plan = analyze_file(task.src_path, self.config)
                 plan_reason = plan.reason
+                
+                # Update destination extension if format changes
+                if plan and plan.action == DecisionAction.OPTIMIZE and plan.target_format:
+                    new_ext = f".{plan.target_format.lower()}"
+                    if new_ext == ".jpeg":
+                        new_ext = ".jpg"
+                    if task.dst_path.suffix.lower() != new_ext:
+                        old_dst = task.dst_path
+                        task.dst_path = task.dst_path.with_suffix(new_ext)
+                        # If resolving collision made them identical again (unlikely but safe)
+                        if task.src_path.resolve() == task.dst_path.resolve():
+                            task.dst_path = task.dst_path.parent / f"{task.dst_path.stem}_optimized{new_ext}"
+                        
+                        # Update rel_p
+                        if rel_p.endswith(old_dst.name):
+                            rel_p = rel_p[:-len(old_dst.name)] + task.dst_path.name
+                        else:
+                            rel_p = str(task.dst_path.relative_to(output_dir))
+                            
             except Exception as e:
                 plan_reason = f"Analysis error: {e}"
                 media_type = task.media_type

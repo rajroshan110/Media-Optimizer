@@ -244,9 +244,11 @@ def analyze_image(path: Path, config: OptimizerConfig) -> Tuple[Optional[ImageIn
         reason.append("WhatsApp-like profile optimization")
 
     # Target format selection:
-    # Photographic images (JPEG, camera HEIC, photographic PNG) target JPEG for maximum universal compatibility & size reduction
-    target_fmt = "JPEG"
-
+    if img_format in ("HEIC", "HEIF") and not config.convert_heic_to_jpeg:
+        target_fmt = "heic"
+    else:
+        target_fmt = "JPEG"
+    
     return info, OptimizationPlan(
         action=DecisionAction.OPTIMIZE,
         media_type=MediaType.IMAGE,

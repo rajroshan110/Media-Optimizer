@@ -164,7 +164,8 @@ def optimize_video(
 
         # Success: atomic move
         temp_dst.replace(final_dst)
-        copy_metadata(src, final_dst, config.hardware.exiftool_path)
+        if config.preserve_metadata:
+            copy_metadata(src, final_dst, config.hardware.exiftool_path)
         preserve_timestamps(src, final_dst)
 
         saved_bytes = orig_size - new_size
@@ -209,6 +210,8 @@ def _fallback_software_transcode(
             new_size = temp_dst.stat().st_size
             if new_size < orig_size * (1.0 - config.min_saving_ratio):
                 temp_dst.replace(dst)
+                if config.preserve_metadata:
+                    copy_metadata(src, dst, config.hardware.exiftool_path)
                 preserve_timestamps(src, dst)
                 pct = ((orig_size - new_size) / orig_size) * 100.0
                 return True, new_size, f"Optimized (CPU fallback) -{pct:.1f}%"

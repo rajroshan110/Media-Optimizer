@@ -52,7 +52,6 @@ def optimize_image(
                 temp_dst.unlink()
             if src.resolve() != dst.resolve():
                 shutil.copy2(src, dst)
-            copy_metadata(src, dst, config.hardware.exiftool_path)
             return True, orig_size, "Fallback to original"
 
         new_size = temp_dst.stat().st_size
@@ -63,7 +62,6 @@ def optimize_image(
             temp_dst.unlink()
             if src.resolve() != dst.resolve():
                 shutil.copy2(src, dst)
-            copy_metadata(src, dst, config.hardware.exiftool_path)
             return True, orig_size, f"Preserved original (savings < {config.min_saving_ratio*100:.0f}%)"
 
         # Apply metadata and atomic replace
@@ -87,7 +85,6 @@ def optimize_image(
         # Fallback to copy
         if src.resolve() != dst.resolve():
             shutil.copy2(src, dst)
-        copy_metadata(src, dst, config.hardware.exiftool_path)
         return False, orig_size, f"Error ({e}), copied original"
 
 
@@ -164,8 +161,8 @@ def _optimize_with_sips(src: Path, dst: Path, plan: OptimizationPlan, config: Op
         return False
 
     try:
-        # Convert HEIC to high-quality JPEG for maximum size reduction & compatibility
-        target_fmt = "jpeg"
+        # Check target format from plan (e.g., 'heic' or 'jpeg')
+        target_fmt = (plan.target_format or "jpeg").lower()
         cmd = [
             sips,
             "-s", "format", target_fmt,
