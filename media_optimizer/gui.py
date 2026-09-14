@@ -79,16 +79,19 @@ class MediaOptimizerApp:
         main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Title / Header
-        title_label = ttk.Label(
-            main_frame,
-            text="MEDIA OPTIMIZER",
-            font=("SF Pro Display", 20, "bold") if sys.platform == "darwin" else ("Helvetica", 18, "bold")
-        )
-        title_label.pack(pady=(0, 4))
+        title_frame = ttk.Frame(main_frame)
+        title_frame.pack(fill=tk.X, pady=(0, 16))
 
-        subtitle = "Apple Silicon Hardware Accelerated | Automatic Quality & Size Tuning"
-        sub_label = ttk.Label(main_frame, text=subtitle, font=("SF Pro Text", 11), foreground="#666666")
-        sub_label.pack(pady=(0, 16))
+        lbl_frame = ttk.Frame(title_frame)
+        lbl_frame.pack(side=tk.LEFT)
+        title_label = ttk.Label(lbl_frame, text="Media Optimizer", font=("SF Pro Display", 22, "bold"))
+        title_label.pack(anchor=tk.W)
+        subtitle = "macOS Apple Silicon Hardware Accelerated | Smart Adaptive Quality"
+        sub_label = ttk.Label(lbl_frame, text=subtitle, font=("SF Pro Text", 11), foreground="#666666")
+        sub_label.pack(anchor=tk.W)
+
+        settings_btn = ttk.Button(title_frame, text="⚙️ Settings", command=self._open_settings)
+        settings_btn.pack(side=tk.RIGHT, anchor=tk.N)
 
         # Media Selection Frame
         folders_frame = ttk.LabelFrame(main_frame, text="Select Media Source & Destination", padding="12 12 12 12")
@@ -195,6 +198,66 @@ class MediaOptimizerApp:
         self.log_text.tag_configure("error", foreground="#f87171")
         self.log_text.tag_configure("complete", foreground="#c084fc")
         self.log_text.tag_configure("info", foreground="#38bdf8")
+
+    def _open_settings(self):
+        """Open a modal window for user settings."""
+        top = tk.Toplevel(self.root)
+        top.title("Optimization Settings")
+        top.geometry("400x380")
+        top.resizable(False, False)
+        top.transient(self.root)
+        top.grab_set()
+
+        frame = ttk.Frame(top, padding="20 20 20 20")
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        # Variables
+        var_heic = tk.BooleanVar(value=self.config.convert_heic_to_jpeg)
+        var_meta = tk.BooleanVar(value=self.config.preserve_metadata)
+        var_img_q = tk.IntVar(value=self.config.jpeg_quality)
+        var_img_max = tk.IntVar(value=self.config.image_max_dimension)
+        var_vid_h = tk.IntVar(value=self.config.video_max_height)
+        var_vid_fps = tk.IntVar(value=self.config.video_max_fps)
+
+        row = 0
+        ttk.Checkbutton(frame, text="Convert HEIC to JPEG", variable=var_heic).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=4)
+        row += 1
+        ttk.Checkbutton(frame, text="Preserve Metadata (EXIF/GPS)", variable=var_meta).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=4)
+        row += 1
+        
+        ttk.Label(frame, text="Image Quality (1-100):").grid(row=row, column=0, sticky=tk.W, pady=4)
+        ttk.Entry(frame, textvariable=var_img_q, width=10).grid(row=row, column=1, sticky=tk.E, pady=4)
+        row += 1
+
+        ttk.Label(frame, text="Max Image Dimension (px):").grid(row=row, column=0, sticky=tk.W, pady=4)
+        ttk.Entry(frame, textvariable=var_img_max, width=10).grid(row=row, column=1, sticky=tk.E, pady=4)
+        row += 1
+
+        ttk.Label(frame, text="Max Video Height (px):").grid(row=row, column=0, sticky=tk.W, pady=4)
+        ttk.Entry(frame, textvariable=var_vid_h, width=10).grid(row=row, column=1, sticky=tk.E, pady=4)
+        row += 1
+
+        ttk.Label(frame, text="Max Video FPS:").grid(row=row, column=0, sticky=tk.W, pady=4)
+        ttk.Entry(frame, textvariable=var_vid_fps, width=10).grid(row=row, column=1, sticky=tk.E, pady=4)
+        row += 1
+
+        def _save():
+            self.config.convert_heic_to_jpeg = var_heic.get()
+            self.config.preserve_metadata = var_meta.get()
+            self.config.jpeg_quality = var_img_q.get()
+            self.config.webp_quality = var_img_q.get() - 2
+            self.config.heic_quality = var_img_q.get() - 2
+            self.config.image_max_dimension = var_img_max.get()
+            self.config.video_max_height = var_vid_h.get()
+            self.config.video_max_fps = var_vid_fps.get()
+            
+            from media_optimizer.config import save_user_config
+            save_user_config(self.config)
+            top.destroy()
+
+        btn_box = ttk.Frame(frame)
+        btn_box.grid(row=row, column=0, columnspan=2, pady=(20, 0))
+        ttk.Button(btn_box, text="Save Settings", command=_save).pack()
 
     def _browse_input_files(self) -> None:
         filetypes = [

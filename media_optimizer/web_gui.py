@@ -386,13 +386,70 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     font-size: 13px;
     display: none;
   }
+  
+  /* Settings Modal */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5); display: none;
+    align-items: center; justify-content: center; z-index: 1000;
+  }
+  .modal-content {
+    background: var(--card); border-radius: 14px;
+    width: 90%; max-width: 500px; padding: 24px;
+    border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .modal-title { font-size: 18px; font-weight: 600; }
+  .close-btn { background: none; border: none; color: var(--subtext); font-size: 20px; cursor: pointer; }
+  .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 14px; }
+  .setting-input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; width: 100px; text-align: right; }
+  .setting-checkbox { width: 18px; height: 18px; }
+  
 </style>
 </head>
 <body>
+
+<div id="settingsModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Optimization Settings</div>
+      <button class="close-btn" onclick="closeSettings()">&times;</button>
+    </div>
+    <div class="setting-row">
+      <label>Convert HEIC to JPEG</label>
+      <input type="checkbox" id="cfg-heic" class="setting-checkbox">
+    </div>
+    <div class="setting-row">
+      <label>Preserve Metadata (EXIF/GPS)</label>
+      <input type="checkbox" id="cfg-meta" class="setting-checkbox">
+    </div>
+    <div class="setting-row">
+      <label>Image Quality (1-100)</label>
+      <input type="number" id="cfg-img-q" class="setting-input" min="1" max="100">
+    </div>
+    <div class="setting-row">
+      <label>Max Image Dimension (px)</label>
+      <input type="number" id="cfg-img-max" class="setting-input">
+    </div>
+    <div class="setting-row">
+      <label>Max Video Height (px)</label>
+      <input type="number" id="cfg-vid-h" class="setting-input">
+    </div>
+    <div class="setting-row">
+      <label>Max Video FPS</label>
+      <input type="number" id="cfg-vid-fps" class="setting-input">
+    </div>
+    <div style="margin-top: 20px;">
+      <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
+    </div>
+  </div>
+</div>
+
 <div class="container">
   <div class="header">
     <h1>Media Optimizer</h1>
     <p>macOS Apple Silicon Hardware Accelerated | Smart Adaptive Quality</p>
+    <button class="btn-secondary" style="margin-top: 10px; font-size: 12px; padding: 6px 12px;" onclick="openSettings()">⚙️ Settings</button>
   </div>
 
   <div class="card">
@@ -550,6 +607,47 @@ async function stopOptimization() {
   await fetch("/api/stop", { method: "POST" });
 }
 
+async function openSettings() {
+  try {
+    const res = await fetch("/api/config");
+    const cfg = await res.json();
+    document.getElementById("cfg-heic").checked = cfg.convert_heic_to_jpeg;
+    document.getElementById("cfg-meta").checked = cfg.preserve_metadata;
+    document.getElementById("cfg-img-q").value = cfg.jpeg_quality;
+    document.getElementById("cfg-img-max").value = cfg.image_max_dimension;
+    document.getElementById("cfg-vid-h").value = cfg.video_max_height;
+    document.getElementById("cfg-vid-fps").value = cfg.video_max_fps;
+    document.getElementById("settingsModal").style.display = "flex";
+  } catch(e) {
+    alert("Could not load settings.");
+  }
+}
+
+function closeSettings() {
+  document.getElementById("settingsModal").style.display = "none";
+}
+
+async function saveSettings() {
+  const payload = {
+    convert_heic_to_jpeg: document.getElementById("cfg-heic").checked,
+    preserve_metadata: document.getElementById("cfg-meta").checked,
+    jpeg_quality: parseInt(document.getElementById("cfg-img-q").value) || 80,
+    image_max_dimension: parseInt(document.getElementById("cfg-img-max").value) || 2048,
+    video_max_height: parseInt(document.getElementById("cfg-vid-h").value) || 1080,
+    video_max_fps: parseInt(document.getElementById("cfg-vid-fps").value) || 30
+  };
+  try {
+    await fetch("/api/config", {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" }
+    });
+    closeSettings();
+  } catch(e) {
+    alert("Could not save settings.");
+  }
+}
+
 function startPolling() {
   if (pollingInterval) clearInterval(pollingInterval);
   pollingInterval = setInterval(pollStatus, 400);
@@ -687,6 +785,21 @@ class WebGUIRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(self.state.to_dict()).encode("utf-8"))
+        elif self.path == "/api/config":
+            from media_optimizer.config import get_default_config
+            conf = get_default_config()
+            data = {
+                "convert_heic_to_jpeg": conf.convert_heic_to_jpeg,
+                "preserve_metadata": conf.preserve_metadata,
+                "jpeg_quality": conf.jpeg_quality,
+                "image_max_dimension": conf.image_max_dimension,
+                "video_max_height": conf.video_max_height,
+                "video_max_fps": conf.video_max_fps,
+            }
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode("utf-8"))
         else:
             self.send_error(404, "Not Found")
 
@@ -721,6 +834,23 @@ class WebGUIRequestHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"path": chosen_path}).encode("utf-8"))
+
+        elif self.path == "/api/config":
+            from media_optimizer.config import get_default_config, save_user_config
+            conf = get_default_config()
+            for k in ["convert_heic_to_jpeg", "preserve_metadata", "jpeg_quality", "image_max_dimension", "video_max_height", "video_max_fps"]:
+                if k in body:
+                    setattr(conf, k, body[k])
+            # Sync related quality fields
+            if "jpeg_quality" in body:
+                conf.webp_quality = body["jpeg_quality"] - 2
+                conf.heic_quality = body["jpeg_quality"] - 2
+            save_user_config(conf)
+            
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "ok"}).encode("utf-8"))
 
         elif self.path == "/api/start":
             inp = body.get("input_dir", "").strip()

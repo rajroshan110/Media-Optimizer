@@ -137,8 +137,42 @@ def detect_hardware() -> HardwareProfile:
     )
 
 
+import json
+
+USER_CONFIG_PATH = Path.home() / ".media_optimizer.json"
+
+def load_user_config(config: OptimizerConfig) -> None:
+    """Load user settings from file and apply them to config."""
+    if USER_CONFIG_PATH.exists():
+        try:
+            with open(USER_CONFIG_PATH, "r") as f:
+                user_data = json.load(f)
+            for k, v in user_data.items():
+                if hasattr(config, k):
+                    setattr(config, k, v)
+        except Exception as e:
+            print(f"Failed to load user config: {e}")
+
+def save_user_config(config: OptimizerConfig) -> None:
+    """Save user settings to file."""
+    # List of keys we allow users to customize
+    user_keys = [
+        "convert_heic_to_jpeg",
+        "preserve_metadata",
+        "jpeg_quality",
+        "image_max_dimension",
+        "video_max_height",
+        "video_max_fps"
+    ]
+    try:
+        user_data = {k: getattr(config, k) for k in user_keys if hasattr(config, k)}
+        with open(USER_CONFIG_PATH, "w") as f:
+            json.dump(user_data, f, indent=2)
+    except Exception as e:
+        print(f"Failed to save user config: {e}")
+
 def get_default_config() -> OptimizerConfig:
-    """Generate default configuration tuned for the current Mac."""
+    """Generate default configuration tuned for the current Mac, and apply user settings."""
     hw = detect_hardware()
 
     # Determine concurrency
@@ -150,8 +184,10 @@ def get_default_config() -> OptimizerConfig:
         video_workers = 1
         image_workers = max(2, hw.cpu_cores // 2)
 
-    return OptimizerConfig(
+    config = OptimizerConfig(
         hardware=hw,
         image_workers=image_workers,
         video_workers=video_workers,
     )
+    load_user_config(config)
+    return config
