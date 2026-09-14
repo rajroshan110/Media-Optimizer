@@ -203,7 +203,7 @@ class MediaOptimizerApp:
         """Open a modal window for user settings."""
         top = tk.Toplevel(self.root)
         top.title("Optimization Settings")
-        top.geometry("450x420")
+        top.geometry("460x460")
         top.resizable(False, False)
         top.transient(self.root)
         top.grab_set()
@@ -250,6 +250,7 @@ class MediaOptimizerApp:
 
         # Variables
         var_heic = tk.BooleanVar(value=self.config.convert_heic_to_jpeg)
+        var_ow = tk.BooleanVar(value=self.config.overwrite_existing)
         var_meta = tk.BooleanVar(value=self.config.preserve_metadata)
         var_img_q = tk.IntVar(value=self.config.jpeg_quality)
         var_img_max = tk.IntVar(value=self.config.image_max_dimension)
@@ -278,6 +279,8 @@ class MediaOptimizerApp:
         row = 0
         add_row(frame, row, "Convert HEIC to JPEG", var_heic, "Converts Apple HEIC photos to standard JPEG for universal compatibility.\nUncheck to keep original format.", is_check=True)
         row += 1
+        add_row(frame, row, "Overwrite Existing Files", var_ow, "When re-processing files, overwrite the existing optimized file instead of adding a suffix like _1.", is_check=True)
+        row += 1
         add_row(frame, row, "Preserve Metadata (EXIF/GPS)", var_meta, "Keeps hidden data like date taken and GPS location.\nUncheck to strip data and save a few kilobytes.", is_check=True)
         row += 1
         add_row(frame, row, "Image Quality (1-100):", var_img_q, "Compression level. 80 is the WhatsApp sweet spot.\nLower = smaller file but blurrier.")
@@ -291,6 +294,7 @@ class MediaOptimizerApp:
 
         def _save():
             self.config.convert_heic_to_jpeg = var_heic.get()
+            self.config.overwrite_existing = var_ow.get()
             self.config.preserve_metadata = var_meta.get()
             self.config.jpeg_quality = var_img_q.get()
             self.config.webp_quality = var_img_q.get() - 2
@@ -302,9 +306,11 @@ class MediaOptimizerApp:
             from media_optimizer.config import save_user_config
             save_user_config(self.config)
             top.destroy()
+            messagebox.showinfo("Settings Saved", "Configuration has been updated and saved to disk.", parent=self.root)
 
         def _reset():
             var_heic.set(True)
+            var_ow.set(False)
             var_meta.set(True)
             var_img_q.set(80)
             var_img_max.set(2048)

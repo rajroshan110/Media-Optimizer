@@ -86,33 +86,39 @@ class Journal:
                     pass
                 conn.commit()
 
-    def is_already_done(self, task: Any, config_hash: str, output_dir: Path) -> bool:
-        """Check if file has already been successfully processed with this config."""
+    def is_already_done(self, task: Any, config_hash: str, output_dir: Optional[Path] = None) -> Optional[Tuple[str, int, int]]:
+        """Check if file has already been successfully processed with this config.
+        Returns (status, orig_size, opt_size) if done, else None.
+        """
+        if output_dir is None:
+            output_dir = self.db_path.parent
+
         src_path_str = str(task.src_path.resolve())
         with self._lock:
             with self._get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute(
-                    "SELECT status, rel_path FROM tasks WHERE src_path = ? AND config_hash = ?",
+                    "SELECT status, rel_path, orig_size FROM tasks WHERE src_path = ? AND config_hash = ? ORDER BY updated_at DESC",
                     (src_path_str, config_hash)
                 )
-                row = cur.fetchone()
-                if not row:
-                    return False
-                
-                status, saved_rel_path = row
-                if status in ("COMPLETED", "SKIPPED"):
-                    dest_file = output_dir / saved_rel_path
-                    if not dest_file.exists():
-                        alt_mp4 = dest_file.with_suffix(".mp4")
-                        if alt_mp4.exists():
-                            dest_file = alt_mp4
-                        else:
-                            return False
-                    
-                    if dest_file.stat().st_size > 0:
-                        return True
-        return False
+                rows = cur.fetchall()
+                for status, saved_rel_path, orig_size in rows:
+                    if status in ("COMPLETED", "SKIPPED"):
+                        dest_file = output_dir / saved_rel_path
+                        if not dest_file.exists():
+                            alt_mp4 = dest_file.with_suffix(".mp4")
+                            if alt_mp4.exists():
+                                dest_file = alt_mp4
+                            else:
+                                continue
+
+                        try:
+                            sz = dest_file.stat().st_size
+                            if sz > 0:
+                                return (status, orig_size, sz)
+                        except OSError:
+                            continue
+        return None
         
     def has_record(self, rel_path: str) -> bool:
         with self._lock:
@@ -155,7 +161,7 @@ class Journal:
         with self._lock:
             with self._get_connection() as conn:
                 cur = conn.cursor()
-                cur.execute("SELECT status, orig_size, opt_size FROM tasks")
+                cur.execute("SELECT status, orig_size, opt_size, rel_path FROM tasks")
                 rows = cur.fetchall()
 
                 completed = 0
@@ -163,22 +169,40 @@ class Journal:
                 failed = 0
                 orig_total = 0
                 opt_total = 0
+                
+                out_dir = self.db_path.parent
 
-                for status, orig_s, opt_s in rows:
-                    orig_total += orig_s
-                    opt_total += opt_s
-                    if status == "COMPLETED":
-                        completed += 1
-                    elif status == "SKIPPED":
-                        skipped += 1
+                for status, orig_s, opt_s, rel_path in rows:
+                    if status in ("COMPLETED", "SKIPPED"):
+                        # Only count files that still exist on disk
+                        p = out_dir / rel_path
+                        if not p.exists():
+                            alt_mp4 = p.with_suffix(".mp4")
+                            if not alt_mp4.exists():
+                                continue
+                            else:
+                                p = alt_mp4
+                        
+                        # Use actual file size for absolute accuracy
+                        try:
+                            actual_sz = p.stat().st_size
+                            opt_total += actual_sz
+                            orig_total += orig_s
+                            if status == "COMPLETED":
+                                completed += 1
+                            else:
+                                skipped += 1
+                        except OSError:
+                            continue
                     elif status == "FAILED":
                         failed += 1
+                        orig_total += orig_s
 
                 saved = max(0, orig_total - opt_total)
                 ratio = (saved / orig_total * 100.0) if orig_total > 0 else 0.0
 
                 return BatchSummary(
-                    total_files=len(rows),
+                    total_files=completed + skipped + failed,
                     completed=completed,
                     skipped=skipped,
                     failed=failed,

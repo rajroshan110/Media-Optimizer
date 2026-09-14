@@ -444,6 +444,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <input type="checkbox" id="cfg-heic" class="setting-checkbox">
     </div>
     <div class="setting-row">
+      <label>Overwrite Existing Files <span data-tooltip="When re-processing files, overwrite the existing optimized file instead of adding a suffix like _1.">ⓘ</span></label>
+      <input type="checkbox" id="cfg-ow" class="setting-checkbox">
+    </div>
+    <div class="setting-row">
       <label>Preserve Metadata <span data-tooltip="Keeps hidden data like date taken and GPS location. Uncheck to strip data and save a few kilobytes.">ⓘ</span></label>
       <input type="checkbox" id="cfg-meta" class="setting-checkbox">
     </div>
@@ -637,6 +641,7 @@ async function openSettings() {
     const res = await fetch("/api/config");
     const cfg = await res.json();
     document.getElementById("cfg-heic").checked = cfg.convert_heic_to_jpeg;
+    document.getElementById("cfg-ow").checked = cfg.overwrite_existing;
     document.getElementById("cfg-meta").checked = cfg.preserve_metadata;
     document.getElementById("cfg-img-q").value = cfg.jpeg_quality;
     document.getElementById("cfg-img-max").value = cfg.image_max_dimension;
@@ -654,6 +659,7 @@ function closeSettings() {
 
 function resetSettings() {
   document.getElementById("cfg-heic").checked = true;
+  document.getElementById("cfg-ow").checked = false;
   document.getElementById("cfg-meta").checked = true;
   document.getElementById("cfg-img-q").value = 80;
   document.getElementById("cfg-img-max").value = 2048;
@@ -664,6 +670,7 @@ function resetSettings() {
 async function saveSettings() {
   const payload = {
     convert_heic_to_jpeg: document.getElementById("cfg-heic").checked,
+    overwrite_existing: document.getElementById("cfg-ow").checked,
     preserve_metadata: document.getElementById("cfg-meta").checked,
     jpeg_quality: parseInt(document.getElementById("cfg-img-q").value) || 80,
     image_max_dimension: parseInt(document.getElementById("cfg-img-max").value) || 2048,
@@ -823,6 +830,7 @@ class WebGUIRequestHandler(BaseHTTPRequestHandler):
             conf = get_default_config()
             data = {
                 "convert_heic_to_jpeg": conf.convert_heic_to_jpeg,
+                "overwrite_existing": conf.overwrite_existing,
                 "preserve_metadata": conf.preserve_metadata,
                 "jpeg_quality": conf.jpeg_quality,
                 "image_max_dimension": conf.image_max_dimension,
@@ -870,7 +878,7 @@ class WebGUIRequestHandler(BaseHTTPRequestHandler):
 
         elif self.path == "/api/config":
             conf = get_default_config()
-            for k in ["convert_heic_to_jpeg", "preserve_metadata", "jpeg_quality", "image_max_dimension", "video_max_height", "video_max_fps"]:
+            for k in ["convert_heic_to_jpeg", "overwrite_existing", "preserve_metadata", "jpeg_quality", "image_max_dimension", "video_max_height", "video_max_fps"]:
                 if k in body:
                     setattr(conf, k, body[k])
             # Sync related quality fields
@@ -944,6 +952,10 @@ class WebGUIRequestHandler(BaseHTTPRequestHandler):
                         self.state.running = False
                         self.state.completed = True
                         self.state.summary = summary.format_report()
+                        self.state.orig_bytes = summary.original_bytes
+                        self.state.opt_bytes = summary.optimized_bytes
+                        self.state.saved_bytes = summary.saved_bytes
+                        self.state.reduction_percent = summary.reduction_percent
                 except Exception as e:
                     with self.state.lock:
                         self.state.running = False
