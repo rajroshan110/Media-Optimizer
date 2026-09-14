@@ -255,9 +255,18 @@ class MediaOptimizerApp:
             save_user_config(self.config)
             top.destroy()
 
+        def _reset():
+            var_heic.set(True)
+            var_meta.set(True)
+            var_img_q.set(80)
+            var_img_max.set(2048)
+            var_vid_h.set(1080)
+            var_vid_fps.set(30)
+
         btn_box = ttk.Frame(frame)
         btn_box.grid(row=row, column=0, columnspan=2, pady=(20, 0))
-        ttk.Button(btn_box, text="Save Settings", command=_save).pack()
+        ttk.Button(btn_box, text="Save Settings", command=_save).pack(side=tk.LEFT, padx=(0, 6))
+        ttk.Button(btn_box, text="Reset", command=_reset).pack(side=tk.LEFT)
 
     def _browse_input_files(self) -> None:
         filetypes = [

@@ -439,8 +439,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <label>Max Video FPS</label>
       <input type="number" id="cfg-vid-fps" class="setting-input">
     </div>
-    <div style="margin-top: 20px;">
+    <div style="margin-top: 20px; display: flex; gap: 10px;">
       <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
+      <button class="btn-secondary" onclick="resetSettings()">Reset</button>
     </div>
   </div>
 </div>
@@ -625,6 +626,15 @@ async function openSettings() {
 
 function closeSettings() {
   document.getElementById("settingsModal").style.display = "none";
+}
+
+function resetSettings() {
+  document.getElementById("cfg-heic").checked = true;
+  document.getElementById("cfg-meta").checked = true;
+  document.getElementById("cfg-img-q").value = 80;
+  document.getElementById("cfg-img-max").value = 2048;
+  document.getElementById("cfg-vid-h").value = 1080;
+  document.getElementById("cfg-vid-fps").value = 30;
 }
 
 async function saveSettings() {
