@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "media-optimizer"
+version = "1.0.0"
+description = "Automatic local media optimization engine for macOS"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pillow>=10.0.0",
+    "numpy>=1.20.0",
+]
+
+[project.scripts]
+media-optimizer = "media_optimizer.cli:main"
+media-optimizer-gui = "media_optimizer.gui:launch_gui"

@@ -1,0 +1,44 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+
+# Testing & logs
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# Generated test media & local outputs
+demo_media/
+demo_media_optimized/
+*_optimized/
+*.tmp.*
+*.sqlite3
+*.sqlite3-journal
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# macOS App Bundle (build artifact generated via scripts/create_app_bundle.sh)
+Media Optimizer.app/
