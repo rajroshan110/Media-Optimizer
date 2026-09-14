@@ -203,10 +203,44 @@ class MediaOptimizerApp:
         """Open a modal window for user settings."""
         top = tk.Toplevel(self.root)
         top.title("Optimization Settings")
-        top.geometry("400x380")
+        top.geometry("450x420")
         top.resizable(False, False)
         top.transient(self.root)
         top.grab_set()
+
+        class Tooltip:
+            def __init__(self, widget, text):
+                self.widget = widget
+                self.text = text
+                self.tipwindow = None
+                self.id = None
+                self.x = self.y = 0
+                self.widget.bind("<Enter>", self.enter)
+                self.widget.bind("<Leave>", self.leave)
+
+            def enter(self, event=None):
+                self.id = self.widget.after(300, self.showtip)
+
+            def leave(self, event=None):
+                if self.id:
+                    self.widget.after_cancel(self.id)
+                if self.tipwindow:
+                    self.tipwindow.destroy()
+                    self.tipwindow = None
+
+            def showtip(self):
+                if self.tipwindow or not self.text:
+                    return
+                x, y, _, _ = self.widget.bbox("insert")
+                x = x + self.widget.winfo_rootx() + 25
+                y = y + self.widget.winfo_rooty() + 20
+                self.tipwindow = tw = tk.Toplevel(self.widget)
+                tw.wm_overrideredirect(True)
+                tw.wm_geometry(f"+{x}+{y}")
+                label = tk.Label(tw, text=self.text, justify=tk.LEFT,
+                              background="#ffffe0", relief=tk.SOLID, borderwidth=1,
+                              font=("SF Pro Text", 11, "normal"))
+                label.pack(ipadx=1)
 
         frame = ttk.Frame(top, padding="20 20 20 20")
         frame.pack(fill=tk.BOTH, expand=True)
@@ -219,26 +253,37 @@ class MediaOptimizerApp:
         var_vid_h = tk.IntVar(value=self.config.video_max_height)
         var_vid_fps = tk.IntVar(value=self.config.video_max_fps)
 
+        def add_row(parent, row, text, var, tooltip, is_check=False):
+            lbl_frame = ttk.Frame(parent)
+            lbl_frame.grid(row=row, column=0, sticky=tk.W, pady=8)
+            
+            if is_check:
+                chk = ttk.Checkbutton(lbl_frame, text=text, variable=var)
+                chk.pack(side=tk.LEFT)
+            else:
+                lbl = ttk.Label(lbl_frame, text=text)
+                lbl.pack(side=tk.LEFT)
+            
+            info = ttk.Label(lbl_frame, text=" ℹ️", foreground="#0a84ff", cursor="hand2")
+            info.pack(side=tk.LEFT)
+            Tooltip(info, tooltip)
+            
+            if not is_check:
+                ent = ttk.Entry(parent, textvariable=var, width=10)
+                ent.grid(row=row, column=1, sticky=tk.E, pady=8)
+
         row = 0
-        ttk.Checkbutton(frame, text="Convert HEIC to JPEG", variable=var_heic).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=4)
+        add_row(frame, row, "Convert HEIC to JPEG", var_heic, "Converts Apple HEIC photos to standard JPEG for universal compatibility.\nUncheck to keep original format.", is_check=True)
         row += 1
-        ttk.Checkbutton(frame, text="Preserve Metadata (EXIF/GPS)", variable=var_meta).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=4)
+        add_row(frame, row, "Preserve Metadata (EXIF/GPS)", var_meta, "Keeps hidden data like date taken and GPS location.\nUncheck to strip data and save a few kilobytes.", is_check=True)
         row += 1
-        
-        ttk.Label(frame, text="Image Quality (1-100):").grid(row=row, column=0, sticky=tk.W, pady=4)
-        ttk.Entry(frame, textvariable=var_img_q, width=10).grid(row=row, column=1, sticky=tk.E, pady=4)
+        add_row(frame, row, "Image Quality (1-100):", var_img_q, "Compression level. 80 is the WhatsApp sweet spot.\nLower = smaller file but blurrier.")
         row += 1
-
-        ttk.Label(frame, text="Max Image Dimension (px):").grid(row=row, column=0, sticky=tk.W, pady=4)
-        ttk.Entry(frame, textvariable=var_img_max, width=10).grid(row=row, column=1, sticky=tk.E, pady=4)
+        add_row(frame, row, "Max Image Dimension (px):", var_img_max, "Resizes huge photos down to this size on their longest edge.\n2048px is WhatsApp HD quality.")
         row += 1
-
-        ttk.Label(frame, text="Max Video Height (px):").grid(row=row, column=0, sticky=tk.W, pady=4)
-        ttk.Entry(frame, textvariable=var_vid_h, width=10).grid(row=row, column=1, sticky=tk.E, pady=4)
+        add_row(frame, row, "Max Video Height (px):", var_vid_h, "Resizes 4K/UHD videos down to this height (e.g., 1080 for 1080p).\nSaves massive space.")
         row += 1
-
-        ttk.Label(frame, text="Max Video FPS:").grid(row=row, column=0, sticky=tk.W, pady=4)
-        ttk.Entry(frame, textvariable=var_vid_fps, width=10).grid(row=row, column=1, sticky=tk.E, pady=4)
+        add_row(frame, row, "Max Video FPS:", var_vid_fps, "Drops 60fps video down to 30fps.\n30fps cuts file size in half with normal motion.")
         row += 1
 
         def _save():

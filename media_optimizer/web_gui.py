@@ -404,6 +404,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 14px; }
   .setting-input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; width: 100px; text-align: right; }
   .setting-checkbox { width: 18px; height: 18px; }
+  span[title] { cursor: help; opacity: 0.8; }
+  span[title]:hover { opacity: 1; }
   
 </style>
 </head>
@@ -416,27 +418,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <button class="close-btn" onclick="closeSettings()">&times;</button>
     </div>
     <div class="setting-row">
-      <label>Convert HEIC to JPEG</label>
+      <label>Convert HEIC to JPEG <span title="Converts Apple HEIC photos to standard JPEG for universal compatibility. Uncheck to keep original format.">ℹ️</span></label>
       <input type="checkbox" id="cfg-heic" class="setting-checkbox">
     </div>
     <div class="setting-row">
-      <label>Preserve Metadata (EXIF/GPS)</label>
+      <label>Preserve Metadata <span title="Keeps hidden data like date taken and GPS location. Uncheck to strip data and save a few kilobytes.">ℹ️</span></label>
       <input type="checkbox" id="cfg-meta" class="setting-checkbox">
     </div>
     <div class="setting-row">
-      <label>Image Quality (1-100)</label>
+      <label>Image Quality (1-100) <span title="Compression level. 80 is the WhatsApp sweet spot. Lower = smaller file but blurrier.">ℹ️</span></label>
       <input type="number" id="cfg-img-q" class="setting-input" min="1" max="100">
     </div>
     <div class="setting-row">
-      <label>Max Image Dimension (px)</label>
+      <label>Max Image Dimension <span title="Resizes huge photos down to this size on their longest edge. 2048px is WhatsApp HD quality.">ℹ️</span></label>
       <input type="number" id="cfg-img-max" class="setting-input">
     </div>
     <div class="setting-row">
-      <label>Max Video Height (px)</label>
+      <label>Max Video Height <span title="Resizes 4K/UHD videos down to this height (e.g., 1080 for 1080p). Saves massive space.">ℹ️</span></label>
       <input type="number" id="cfg-vid-h" class="setting-input">
     </div>
     <div class="setting-row">
-      <label>Max Video FPS</label>
+      <label>Max Video FPS <span title="Drops 60fps video down to 30fps. 30fps cuts file size in half with normal motion.">ℹ️</span></label>
       <input type="number" id="cfg-vid-fps" class="setting-input">
     </div>
     <div style="margin-top: 20px; display: flex; gap: 10px;">
