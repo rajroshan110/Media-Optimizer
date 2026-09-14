@@ -445,7 +445,7 @@ def analyze_video(path: Path, config: OptimizerConfig) -> Tuple[Optional[VideoIn
     # Use hevc_videotoolbox if available on Apple Silicon, fallback to libx265 or libx264
     if config.prefer_hardware_encoder and config.hardware.has_hevc_videotoolbox:
         target_vcodec = "hevc_videotoolbox"
-    elif "libx265" in subprocess.run([config.hardware.ffmpeg_path, "-encoders"], capture_output=True, text=True).stdout:
+    elif config.hardware.has_libx265:
         target_vcodec = "libx265"
     else:
         target_vcodec = "libx264"

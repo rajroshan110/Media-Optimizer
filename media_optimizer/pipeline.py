@@ -19,15 +19,7 @@ from media_optimizer.core.journal import BatchSummary, Journal
 from media_optimizer.core.video_opt import optimize_video
 
 
-def format_bytes(num_bytes: int) -> str:
-    """Format bytes into readable units."""
-    if num_bytes >= 1024 ** 3:
-        return f"{num_bytes / (1024 ** 3):.2f} GB"
-    elif num_bytes >= 1024 ** 2:
-        return f"{num_bytes / (1024 ** 2):.1f} MB"
-    elif num_bytes >= 1024:
-        return f"{num_bytes / 1024:.1f} KB"
-    return f"{num_bytes} B"
+from media_optimizer.utils import format_bytes
 
 
 @dataclass
@@ -249,11 +241,22 @@ class OptimizationPipeline:
 
         processed_counter = skipped_already_done
         counter_lock = threading.Lock()
+        
+        # In-memory counters for performance
+        initial_summary = journal.get_summary()
+        current_completed = initial_summary.completed
+        current_skipped = initial_summary.skipped
+        current_failed = initial_summary.failed
+        current_orig_bytes = initial_summary.original_bytes
+        current_opt_bytes = initial_summary.optimized_bytes
+        
         active_files: set = set()
         active_lock = threading.Lock()
 
         def _process_task(task: TaskItem) -> None:
-            nonlocal processed_counter
+            nonlocal processed_counter, current_orig_bytes, current_opt_bytes
+            nonlocal current_completed, current_skipped, current_failed
+            
             if self._stop_requested.is_set():
                 return
 
@@ -286,14 +289,17 @@ class OptimizationPipeline:
             emit_activity(f"Optimizing {rel_p} ({format_bytes(orig_sz)}) - {plan_reason}", "start")
 
             if on_progress:
-                summary_now = journal.get_summary()
+                with counter_lock:
+                    c_orig = current_orig_bytes
+                    c_opt = current_opt_bytes
+                
                 on_progress(
                     processed_counter,
                     total_items,
                     active_display,
-                    summary_now.original_bytes,
-                    summary_now.optimized_bytes,
-                    summary_now.saved_bytes,
+                    c_orig,
+                    c_opt,
+                    max(0, c_orig - c_opt),
                     f"Processing {task.src_path.name}",
                 )
 
@@ -337,17 +343,28 @@ class OptimizationPipeline:
             with counter_lock:
                 processed_counter += 1
                 curr_count = processed_counter
-
-            summary = journal.get_summary()
+                
+                current_orig_bytes += orig_sz
+                current_opt_bytes += final_sz
+                
+                if act_level == "saved":
+                    current_completed += 1
+                elif act_level == "copied":
+                    current_skipped += 1
+                elif act_level == "error":
+                    current_failed += 1
+                    
+                c_orig = current_orig_bytes
+                c_opt = current_opt_bytes
 
             if on_progress:
                 on_progress(
                     curr_count,
                     total_items,
                     active_display,
-                    summary.original_bytes,
-                    summary.optimized_bytes,
-                    summary.saved_bytes,
+                    c_orig,
+                    c_opt,
+                    max(0, c_orig - c_opt),
                     msg,
                 )
 

@@ -10,15 +10,7 @@ from media_optimizer.core.analyzer import analyze_file
 from media_optimizer.pipeline import OptimizationPipeline
 
 
-def format_bytes(num_bytes: int) -> str:
-    """Format bytes into readable units."""
-    if num_bytes >= 1024 ** 3:
-        return f"{num_bytes / (1024 ** 3):.2f} GB"
-    elif num_bytes >= 1024 ** 2:
-        return f"{num_bytes / (1024 ** 2):.1f} MB"
-    elif num_bytes >= 1024:
-        return f"{num_bytes / 1024:.1f} KB"
-    return f"{num_bytes} B"
+from media_optimizer.utils import format_bytes
 
 
 def run_dry_run(input_target: Path, config) -> None:

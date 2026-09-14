@@ -71,6 +71,7 @@ class TestActivityLogAndWhatsAppProfile(unittest.TestCase):
         # 2. Check for scanning and discovery logs
         msgs = [e["msg"] for e in activity_events]
         levels = [e["level"] for e in activity_events]
+        print("LEVELS:", levels)
 
         self.assertTrue(any("Scanning" in m for m in msgs))
         self.assertTrue(any("Discovered 2 media items" in m for m in msgs))

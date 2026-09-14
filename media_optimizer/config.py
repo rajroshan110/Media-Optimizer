@@ -16,6 +16,8 @@ class HardwareProfile:
     total_ram_gb: float
     has_hevc_videotoolbox: bool
     has_h264_videotoolbox: bool
+    has_libx265: bool
+    has_libx264: bool
     ffmpeg_path: Optional[str]
     ffprobe_path: Optional[str]
     exiftool_path: Optional[str]
@@ -106,12 +108,16 @@ def detect_hardware() -> HardwareProfile:
     # Check VideoToolbox encoders
     has_hevc_vt = False
     has_h264_vt = False
+    has_libx265 = False
+    has_libx264 = False
     if ffmpeg_path:
         try:
             res = subprocess.run([ffmpeg_path, "-encoders"], capture_output=True, text=True)
             output = res.stdout + res.stderr
             has_hevc_vt = "hevc_videotoolbox" in output
             has_h264_vt = "h264_videotoolbox" in output
+            has_libx265 = "libx265" in output
+            has_libx264 = "libx264" in output
         except Exception:
             pass
 
@@ -121,6 +127,8 @@ def detect_hardware() -> HardwareProfile:
         total_ram_gb=total_ram_gb,
         has_hevc_videotoolbox=has_hevc_vt,
         has_h264_videotoolbox=has_h264_vt,
+        has_libx265=has_libx265,
+        has_libx264=has_libx264,
         ffmpeg_path=ffmpeg_path,
         ffprobe_path=ffprobe_path,
         exiftool_path=exiftool_path,

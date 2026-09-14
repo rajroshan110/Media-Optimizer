@@ -134,7 +134,7 @@ def _optimize_with_pillow(src: Path, dst: Path, plan: OptimizationPlan, config: 
                 save_kwargs = {
                     "format": "JPEG",
                     "quality": plan.target_quality or config.jpeg_quality,
-                    "subsampling": 1,  # 4:2:0 chroma subsampling for optimal size/quality
+                    "subsampling": 2,  # 4:2:0 chroma subsampling (Pillow: 0=4:4:4, 1=4:2:2, 2=4:2:0)
                 }
                 # Preserve embedded EXIF if present without external process overhead
                 exif_data = img.info.get("exif")

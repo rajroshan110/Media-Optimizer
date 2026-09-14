@@ -15,22 +15,14 @@ except ImportError:
     messagebox = None
     ttk = None
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from media_optimizer.config import get_default_config
 from media_optimizer.core.journal import BatchSummary
 from media_optimizer.pipeline import OptimizationPipeline
 
 
-def format_bytes(num_bytes: int) -> str:
-    """Format bytes into human-readable strings."""
-    if num_bytes >= 1024 ** 3:
-        return f"{num_bytes / (1024 ** 3):.2f} GB"
-    elif num_bytes >= 1024 ** 2:
-        return f"{num_bytes / (1024 ** 2):.1f} MB"
-    elif num_bytes >= 1024:
-        return f"{num_bytes / 1024:.1f} KB"
-    return f"{num_bytes} B"
+from media_optimizer.utils import format_bytes
 
 
 class MediaOptimizerApp:

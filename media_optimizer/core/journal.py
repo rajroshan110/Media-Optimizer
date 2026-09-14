@@ -3,6 +3,7 @@
 import sqlite3
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -21,14 +22,7 @@ class BatchSummary:
 
     def format_report(self) -> str:
         """Format an informative summary report."""
-        def fmt_size(num_bytes: int) -> str:
-            if num_bytes >= 1024 ** 3:
-                return f"{num_bytes / (1024 ** 3):.2f} GB"
-            elif num_bytes >= 1024 ** 2:
-                return f"{num_bytes / (1024 ** 2):.1f} MB"
-            elif num_bytes >= 1024:
-                return f"{num_bytes / 1024:.1f} KB"
-            return f"{num_bytes} B"
+        from media_optimizer.utils import format_bytes
 
         return (
             f"----------------------------------------\n"
@@ -38,15 +32,14 @@ class BatchSummary:
             f"  - Completed:        {self.completed:,}\n"
             f"  - Skipped/Copied:   {self.skipped:,}\n"
             f"  - Failed:           {self.failed:,}\n"
-            f"Original size:        {fmt_size(self.original_bytes)}\n"
-            f"Optimized size:       {fmt_size(self.optimized_bytes)}\n"
-            f"Space saved:          {fmt_size(self.saved_bytes)}\n"
+            f"Original size:        {format_bytes(self.original_bytes)}\n"
+            f"Optimized size:       {format_bytes(self.optimized_bytes)}\n"
+            f"Space saved:          {format_bytes(self.saved_bytes)}\n"
             f"Reduction:            {self.reduction_percent:.1f}%\n"
             f"----------------------------------------"
         )
 
 
-from contextlib import contextmanager
 
 
 class Journal:
