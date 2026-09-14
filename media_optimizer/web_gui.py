@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from media_optimizer.config import get_default_config
+from media_optimizer.config import get_default_config, save_user_config
 from media_optimizer.core.journal import BatchSummary
 from media_optimizer.pipeline import OptimizationPipeline
 
@@ -820,7 +820,6 @@ class WebGUIRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(self.state.to_dict()).encode("utf-8"))
         elif self.path == "/api/config":
-            from media_optimizer.config import get_default_config
             conf = get_default_config()
             data = {
                 "convert_heic_to_jpeg": conf.convert_heic_to_jpeg,
@@ -870,7 +869,6 @@ class WebGUIRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"path": chosen_path}).encode("utf-8"))
 
         elif self.path == "/api/config":
-            from media_optimizer.config import get_default_config, save_user_config
             conf = get_default_config()
             for k in ["convert_heic_to_jpeg", "preserve_metadata", "jpeg_quality", "image_max_dimension", "video_max_height", "video_max_fps"]:
                 if k in body:
