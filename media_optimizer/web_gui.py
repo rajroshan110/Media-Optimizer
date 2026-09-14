@@ -404,8 +404,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 14px; }
   .setting-input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; width: 100px; text-align: right; }
   .setting-checkbox { width: 18px; height: 18px; }
-  span[title] { cursor: help; opacity: 0.8; }
-  span[title]:hover { opacity: 1; }
+  span[data-tooltip] { 
+    cursor: help; opacity: 0.8; position: relative; 
+    display: inline-block; margin-left: 6px;
+  }
+  span[data-tooltip]:hover { opacity: 1; }
+  span[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 150%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #000;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    white-space: normal;
+    width: max-content;
+    max-width: 260px;
+    z-index: 10000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    pointer-events: none;
+    line-height: 1.4;
+  }
   
 </style>
 </head>
@@ -418,27 +440,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <button class="close-btn" onclick="closeSettings()">&times;</button>
     </div>
     <div class="setting-row">
-      <label>Convert HEIC to JPEG <span title="Converts Apple HEIC photos to standard JPEG for universal compatibility. Uncheck to keep original format.">ⓘ</span></label>
+      <label>Convert HEIC to JPEG <span data-tooltip="Converts Apple HEIC photos to standard JPEG for universal compatibility. Uncheck to keep original format.">ⓘ</span></label>
       <input type="checkbox" id="cfg-heic" class="setting-checkbox">
     </div>
     <div class="setting-row">
-      <label>Preserve Metadata <span title="Keeps hidden data like date taken and GPS location. Uncheck to strip data and save a few kilobytes.">ⓘ</span></label>
+      <label>Preserve Metadata <span data-tooltip="Keeps hidden data like date taken and GPS location. Uncheck to strip data and save a few kilobytes.">ⓘ</span></label>
       <input type="checkbox" id="cfg-meta" class="setting-checkbox">
     </div>
     <div class="setting-row">
-      <label>Image Quality (1-100) <span title="Compression level. 80 is the WhatsApp sweet spot. Lower = smaller file but blurrier.">ⓘ</span></label>
+      <label>Image Quality (1-100) <span data-tooltip="Compression level. 80 is the WhatsApp sweet spot. Lower = smaller file but blurrier.">ⓘ</span></label>
       <input type="number" id="cfg-img-q" class="setting-input" min="1" max="100">
     </div>
     <div class="setting-row">
-      <label>Max Image Dimension <span title="Resizes huge photos down to this size on their longest edge. 2048px is WhatsApp HD quality.">ⓘ</span></label>
+      <label>Max Image Dimension <span data-tooltip="Resizes huge photos down to this size on their longest edge. 2048px is WhatsApp HD quality.">ⓘ</span></label>
       <input type="number" id="cfg-img-max" class="setting-input">
     </div>
     <div class="setting-row">
-      <label>Max Video Height <span title="Resizes 4K/UHD videos down to this height (e.g., 1080 for 1080p). Saves massive space.">ⓘ</span></label>
+      <label>Max Video Height <span data-tooltip="Resizes 4K/UHD videos down to this height (e.g., 1080 for 1080p). Saves massive space.">ⓘ</span></label>
       <input type="number" id="cfg-vid-h" class="setting-input">
     </div>
     <div class="setting-row">
-      <label>Max Video FPS <span title="Drops 60fps video down to 30fps. 30fps cuts file size in half with normal motion.">ⓘ</span></label>
+      <label>Max Video FPS <span data-tooltip="Drops 60fps video down to 30fps. 30fps cuts file size in half with normal motion.">ⓘ</span></label>
       <input type="number" id="cfg-vid-fps" class="setting-input">
     </div>
     <div style="margin-top: 20px; display: flex; gap: 10px;">
