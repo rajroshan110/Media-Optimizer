@@ -238,8 +238,11 @@ class MediaOptimizerApp:
                 tw.wm_overrideredirect(True)
                 tw.wm_geometry(f"+{x}+{y}")
                 label = tk.Label(tw, text=self.text, justify=tk.LEFT,
-                              background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                              font=("SF Pro Text", 11, "normal"))
+                              background="#1e1e1e" if sys.platform == "darwin" else "#ffffe0", 
+                              foreground="#ffffff" if sys.platform == "darwin" else "#000000",
+                              relief=tk.SOLID, borderwidth=1,
+                              font=("SF Pro Text", 11, "normal"),
+                              padx=8, pady=6)
                 label.pack(ipadx=1)
 
         frame = ttk.Frame(top, padding="20 20 20 20")
@@ -264,8 +267,8 @@ class MediaOptimizerApp:
                 lbl = ttk.Label(lbl_frame, text=text)
                 lbl.pack(side=tk.LEFT)
             
-            info = ttk.Label(lbl_frame, text=" ℹ️", foreground="#0a84ff", cursor="hand2")
-            info.pack(side=tk.LEFT)
+            info = ttk.Label(lbl_frame, text=" ⓘ", foreground="#0a84ff", cursor="hand2", font=("SF Pro Text", 13))
+            info.pack(side=tk.LEFT, padx=(4, 0))
             Tooltip(info, tooltip)
             
             if not is_check:
