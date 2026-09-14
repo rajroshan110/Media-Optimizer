@@ -45,20 +45,27 @@ Using Apple Silicon's hardware video encoders (`hevc_videotoolbox`), smart image
   - **Over-bloated 4K/60fps videos & raw camera photos**: Intelligently resized and re-encoded using high-efficiency HEVC/JPEG.
   - **Already efficient media**: Small photos (<350 KB) or modern low-bitrate HEVC videos are preserved as-is to avoid generational quality degradation.
 
-- 🛡️ **Zero Overwrites & 100% Non-Destructive**
-  - Original files are **never modified, replaced, or deleted**.
+- 🛡️ **Zero Overwrites & Configurable Collision Handling**
+  - Original files are **never modified, replaced, or deleted** under any circumstance.
   - When saving into the same folder, outputs automatically append `_optimized` (e.g., `IMG_0042.jpg` → `IMG_0042_optimized.jpg`).
+  - **Flexible Collision Strategy**: Choose between non-destructive numeric suffixing (`photo_1.jpg`, `photo_2.jpg`) to keep multiple compression experiments, or clean in-place overwriting of previously generated optimized files.
   - If a file cannot be made smaller with meaningful savings (minimum 5%), the original is preserved.
+
+- ⚙️ **Interactive Settings & Built-In Tooltips**
+  - Fine-tune optimization parameters right from the native desktop GUI or local web interface.
+  - Helpful `ⓘ` hover tooltips explain the performance and perceptual trade-offs of each option.
+  - Features a **Reset to Defaults** button to instantly restore the WhatsApp perceptual sweet-spot settings.
+  - Automatically persists user configurations to `~/.media_optimizer.json`.
 
 - 📍 **Full Metadata & Timestamp Preservation**
   Transfers EXIF metadata, camera settings, color profiles, GPS location data, and file modification/creation timestamps via ExifTool.
 
-- ⏱️ **Fault-Tolerant & Resumable**
-  Backed by a local SQLite journal. If a 50 GB batch is paused or interrupted, restarting resumes immediately, skipping already completed files.
+- ⏱️ **Fault-Tolerant & Config-Aware Resumability**
+  Backed by a WAL-mode SQLite journal. Resuming an interrupted batch skips already-completed files. If you adjust your compression settings (e.g., quality factor or resolution), the engine recognizes the change via config hashing and safely re-processes your media.
 
 - 🎨 **Three Interfaces for Every Workflow**
-  1. **macOS Native Aqua GUI**: Clean desktop interface with real-time dark activity log, single/multi-file selection, and space-saving stats.
-  2. **Browser-Based Local Web GUI**: Standalone zero-dependency web interface running locally on `localhost:8484`.
+  1. **macOS Native Aqua GUI**: Clean desktop interface with real-time dark activity log, single/multi-file selection, settings modal, and space-saving stats.
+  2. **Browser-Based Local Web GUI**: Zero-dependency web interface running locally on `localhost:8484` with instant CSS tooltips and live progress metrics.
   3. **Terminal CLI**: Scriptable command-line interface with `--dry-run`, custom worker concurrency, and batch reports.
 
 - 📊 **WhatsApp Benchmark Suite**
@@ -135,6 +142,22 @@ Access the interface at `http://localhost:8484`.
 # Custom concurrency tuning
 ./run.sh "/path/to/media" --image-workers 8 --video-workers 2
 ```
+
+---
+
+## ⚙️ Configuration & Settings
+
+Both the Desktop GUI and Web GUI feature an interactive settings modal with instant tooltips. Settings are saved to `~/.media_optimizer.json`:
+
+| Setting | Default | Description |
+| :--- | :---: | :--- |
+| **Convert HEIC to JPEG** | `Enabled` | Converts Apple HEIC photos to standard JPEG for cross-platform compatibility. Uncheck to preserve HEIC. |
+| **Overwrite Existing Files** | `Disabled` | When disabled, collisions append a numeric suffix (`_1`, `_2`) so both files are kept. When enabled, updates previous outputs cleanly. Originals are always protected. |
+| **Preserve Metadata** | `Enabled` | Retains full camera EXIF, GPS location, color profiles, and timestamps via ExifTool. |
+| **Image Quality** | `80` | Perceptual sweet-spot quality factor (1–100). WhatsApp uses 78–80 for maximum space saving with sharp detail. |
+| **Max Image Dimension** | `2048 px` | Downscales camera photos exceeding this dimension on their longest edge (matches WhatsApp HD). |
+| **Max Video Height** | `1080 px` | Downscales 4K / UHD videos to 1080p, reducing file size by up to 85% with sharp visual fidelity. |
+| **Max Video FPS** | `30 fps` | Caps high-framerate (60fps) clips to 30fps to halve encoding overhead while maintaining smooth motion. |
 
 ---
 
