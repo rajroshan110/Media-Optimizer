@@ -43,6 +43,14 @@ def check_environment() -> dict:
     except ImportError:
         report["suggestions"].append("Tkinter is missing; app will run in browser-based Web GUI fallback.")
 
+    # pillow-heif
+    try:
+        import pillow_heif
+        report["pillow_heif_ok"] = True
+    except ImportError:
+        report["pillow_heif_ok"] = False
+        report["suggestions"].append("pillow-heif is highly recommended for Native HEIC Deep Mode support (Run: pip3 install pillow-heif).")
+
     # Architecture
     if sys.platform == "darwin":
         arch = os.uname().machine
@@ -87,6 +95,8 @@ def print_diagnostic_report():
     print(f"Platform:            macOS ({'Apple Silicon arm64' if rep['is_apple_silicon'] else 'Intel x86_64'})")
     print(f"Python Version:      {rep['python_version']} {'✅' if rep['python_ok'] else '❌'}")
     print(f"Pillow (Image Core): {'Installed ✅' if rep['pillow_ok'] else 'Missing ❌'}")
+    if rep['pillow_ok']:
+        print(f"  └─ HEIC Native:    {'pillow-heif ✅' if rep.get('pillow_heif_ok') else 'Missing ⚠️ (sips fallback)'}")
     print(f"Tkinter (Native GUI):{'Available ✅' if rep['tkinter_ok'] else 'Not Available ⚠️ (Web GUI fallback)'}")
     print(f"macOS sips (HEIC):   {'Available ✅' if rep['sips_ok'] else 'Missing ⚠️'}")
     print(f"FFmpeg (Video Core): {'Installed ✅' if rep['ffmpeg_ok'] else 'Missing ❌'}")

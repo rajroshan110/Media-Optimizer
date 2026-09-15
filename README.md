@@ -106,7 +106,7 @@ Run the built-in diagnostic checker to confirm your setup:
 ```bash
 pip3 install -r requirements.txt
 ```
-*(Only `Pillow` is required. All other components use the Python standard library and macOS native frameworks).*
+*(Only `Pillow` and `pillow-heif` are required. All other components use the Python standard library and native macOS frameworks).*
 
 ---
 
