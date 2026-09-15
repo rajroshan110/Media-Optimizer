@@ -40,9 +40,11 @@ FALLBACK_BIN=""
 
 for py in "${CANDIDATES[@]}"; do
     if [ -n "$py" ] && [ -x "$py" ]; then
-        if "$py" -c "import PIL, tkinter" 2>/dev/null; then
+        if "$py" -c "import PIL, tkinter, pillow_heif" 2>/dev/null; then
             PYTHON_BIN="$py"
             break
+        elif "$py" -c "import PIL, tkinter" 2>/dev/null && [ -z "$FALLBACK_BIN" ]; then
+            FALLBACK_BIN="$py"
         elif "$py" -c "import PIL" 2>/dev/null && [ -z "$FALLBACK_BIN" ]; then
             FALLBACK_BIN="$py"
         fi
