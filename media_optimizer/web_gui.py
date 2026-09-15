@@ -39,6 +39,8 @@ class OptimizerState:
         self.opt_bytes: int = 0
         self.saved_bytes: int = 0
         self.reduction_percent: float = 0.0
+        self.res_saved_bytes: int = 0
+        self.codec_saved_bytes: int = 0
         self.logs: List[Dict[str, Any]] = []
         self.error: Optional[str] = None
         self.summary: Optional[str] = None
@@ -54,6 +56,8 @@ class OptimizerState:
             self.opt_bytes = 0
             self.saved_bytes = 0
             self.reduction_percent = 0.0
+            self.res_saved_bytes = 0
+            self.codec_saved_bytes = 0
             self.logs = []
             self.error = None
             self.summary = None
@@ -86,6 +90,8 @@ class OptimizerState:
                 "orig_formatted": format_bytes(self.orig_bytes),
                 "opt_formatted": format_bytes(self.opt_bytes),
                 "saved_formatted": format_bytes(self.saved_bytes),
+                "res_saved_formatted": format_bytes(self.res_saved_bytes),
+                "codec_saved_formatted": format_bytes(self.codec_saved_bytes),
                 "reduction_percent": round(self.reduction_percent, 1),
                 "logs": self.logs[-100:],  # Return latest 100 log entries
                 "error": self.error,
@@ -440,6 +446,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <button class="close-btn" onclick="closeSettings()">&times;</button>
     </div>
     <div class="setting-row">
+      <label>Automatic Best Quality (Autonomous) <span data-tooltip="Completely autonomous: Media Optimizer inspects each file's entropy and visual structure to automatically select the optimal rate-distortion quality and resolution for least storage and pristine visual quality. Uncheck to manually enforce fixed constraints below.">ⓘ</span></label>
+      <input type="checkbox" id="cfg-auto-q" class="setting-checkbox" onchange="updateAutoUI()">
+    </div>
+    <div class="setting-row">
+      <label>Deep Perceptual Analysis (Slow) <span data-tooltip="Performs local-window SSIM search and video bitrate sampling for mathematically optimal compression. Slower. Leave off for WhatsApp-fast single-pass processing.">ⓘ</span></label>
+      <input type="checkbox" id="cfg-deep-mode" class="setting-checkbox">
+    </div>
+    <div class="setting-row">
       <label>Convert HEIC to JPEG <span data-tooltip="Converts Apple HEIC photos to standard JPEG for universal compatibility. Uncheck to keep original format.">ⓘ</span></label>
       <input type="checkbox" id="cfg-heic" class="setting-checkbox">
     </div>
@@ -452,20 +466,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       <input type="checkbox" id="cfg-meta" class="setting-checkbox">
     </div>
     <div class="setting-row">
-      <label>Image Quality (1-100) <span data-tooltip="Compression level. 80 is the WhatsApp sweet spot. Lower = smaller file but blurrier.">ⓘ</span></label>
-      <input type="number" id="cfg-img-q" class="setting-input" min="1" max="100">
+      <label>Manual Image Quality (1-100) <span data-tooltip="Compression level when auto quality is off. 80 is the sweet spot. Lower = smaller file but blurrier.">ⓘ</span></label>
+      <input type="number" id="cfg-img-q" class="setting-input manual-setting" min="1" max="100">
     </div>
     <div class="setting-row">
       <label>Max Image Dimension <span data-tooltip="Resizes huge photos down to this size on their longest edge. 2048px is WhatsApp HD quality.">ⓘ</span></label>
-      <input type="number" id="cfg-img-max" class="setting-input">
+      <input type="number" id="cfg-img-max" class="setting-input manual-setting">
     </div>
     <div class="setting-row">
       <label>Max Video Height <span data-tooltip="Resizes 4K/UHD videos down to this height (e.g., 1080 for 1080p). Saves massive space.">ⓘ</span></label>
-      <input type="number" id="cfg-vid-h" class="setting-input">
+      <input type="number" id="cfg-vid-h" class="setting-input manual-setting">
     </div>
     <div class="setting-row">
       <label>Max Video FPS <span data-tooltip="Drops 60fps video down to 30fps. 30fps cuts file size in half with normal motion.">ⓘ</span></label>
-      <input type="number" id="cfg-vid-fps" class="setting-input">
+      <input type="number" id="cfg-vid-fps" class="setting-input manual-setting">
     </div>
     <div style="margin-top: 20px; display: flex; gap: 10px;">
       <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
@@ -640,6 +654,8 @@ async function openSettings() {
   try {
     const res = await fetch("/api/config");
     const cfg = await res.json();
+    document.getElementById("cfg-auto-q").checked = cfg.auto_quality !== undefined ? cfg.auto_quality : true;
+    document.getElementById("cfg-deep-mode").checked = cfg.deep_mode !== undefined ? cfg.deep_mode : false;
     document.getElementById("cfg-heic").checked = cfg.convert_heic_to_jpeg;
     document.getElementById("cfg-ow").checked = cfg.overwrite_existing;
     document.getElementById("cfg-meta").checked = cfg.preserve_metadata;
@@ -647,9 +663,25 @@ async function openSettings() {
     document.getElementById("cfg-img-max").value = cfg.image_max_dimension;
     document.getElementById("cfg-vid-h").value = cfg.video_max_height;
     document.getElementById("cfg-vid-fps").value = cfg.video_max_fps;
+    updateAutoUI();
     document.getElementById("settingsModal").style.display = "flex";
   } catch(e) {
     alert("Could not load settings.");
+  }
+}
+
+function updateAutoUI() {
+  const isAuto = document.getElementById("cfg-auto-q").checked;
+  document.querySelectorAll(".manual-setting").forEach(el => {
+    el.disabled = isAuto;
+    el.style.opacity = isAuto ? "0.45" : "1.0";
+    el.style.cursor = isAuto ? "not-allowed" : "text";
+  });
+  
+  const deepModeCb = document.getElementById("cfg-deep-mode");
+  if (deepModeCb) {
+    deepModeCb.disabled = !isAuto;
+    deepModeCb.parentElement.style.opacity = isAuto ? "1.0" : "0.45";
   }
 }
 
@@ -658,6 +690,8 @@ function closeSettings() {
 }
 
 function resetSettings() {
+  document.getElementById("cfg-auto-q").checked = true;
+  document.getElementById("cfg-deep-mode").checked = false;
   document.getElementById("cfg-heic").checked = true;
   document.getElementById("cfg-ow").checked = false;
   document.getElementById("cfg-meta").checked = true;
@@ -665,10 +699,13 @@ function resetSettings() {
   document.getElementById("cfg-img-max").value = 2048;
   document.getElementById("cfg-vid-h").value = 1080;
   document.getElementById("cfg-vid-fps").value = 30;
+  updateAutoUI();
 }
 
 async function saveSettings() {
   const payload = {
+    auto_quality: document.getElementById("cfg-auto-q").checked,
+    deep_mode: document.getElementById("cfg-deep-mode").checked,
     convert_heic_to_jpeg: document.getElementById("cfg-heic").checked,
     overwrite_existing: document.getElementById("cfg-ow").checked,
     preserve_metadata: document.getElementById("cfg-meta").checked,
@@ -767,7 +804,11 @@ async function pollStatus() {
           banner.style.display = "block";
           banner.style.borderColor = "var(--success)";
           banner.style.background = "rgba(52, 199, 89, 0.12)";
-          banner.innerHTML = `<strong>Batch Finished!</strong> Space saved: <strong>${data.saved_formatted}</strong> (${data.reduction_percent}% reduction).`;
+          let breakdownHTML = "";
+          if (data.res_saved_formatted !== "0 B" || data.codec_saved_formatted !== "0 B") {
+             breakdownHTML = `<br><span style="font-size: 0.9em; opacity: 0.85;">(Spatial Resizing: ${data.res_saved_formatted} | Codec Efficiency: ${data.codec_saved_formatted})</span>`;
+          }
+          banner.innerHTML = `<strong>Batch Finished!</strong> Space saved: <strong>${data.saved_formatted}</strong> (${data.reduction_percent}% reduction).${breakdownHTML}`;
         }
       } else {
         document.getElementById("currentStatus").innerText = "Stopped";
@@ -829,6 +870,8 @@ class WebGUIRequestHandler(BaseHTTPRequestHandler):
         elif self.path == "/api/config":
             conf = get_default_config()
             data = {
+                "auto_quality": getattr(conf, "auto_quality", True),
+                "deep_mode": getattr(conf, "deep_mode", False),
                 "convert_heic_to_jpeg": conf.convert_heic_to_jpeg,
                 "overwrite_existing": conf.overwrite_existing,
                 "preserve_metadata": conf.preserve_metadata,
@@ -878,7 +921,7 @@ class WebGUIRequestHandler(BaseHTTPRequestHandler):
 
         elif self.path == "/api/config":
             conf = get_default_config()
-            for k in ["convert_heic_to_jpeg", "overwrite_existing", "preserve_metadata", "jpeg_quality", "image_max_dimension", "video_max_height", "video_max_fps"]:
+            for k in ["auto_quality", "deep_mode", "convert_heic_to_jpeg", "overwrite_existing", "preserve_metadata", "jpeg_quality", "image_max_dimension", "video_max_height", "video_max_fps"]:
                 if k in body:
                     setattr(conf, k, body[k])
             # Sync related quality fields
@@ -955,6 +998,8 @@ class WebGUIRequestHandler(BaseHTTPRequestHandler):
                         self.state.orig_bytes = summary.original_bytes
                         self.state.opt_bytes = summary.optimized_bytes
                         self.state.saved_bytes = summary.saved_bytes
+                        self.state.res_saved_bytes = summary.res_saved_bytes
+                        self.state.codec_saved_bytes = summary.codec_saved_bytes
                         self.state.reduction_percent = summary.reduction_percent
                 except Exception as e:
                     with self.state.lock:

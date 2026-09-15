@@ -58,6 +58,10 @@ class OptimizerConfig:
     video_prio_speed: bool = True                # Hint VideoToolbox to prioritize throughput speed
 
     # General options
+    auto_quality: bool = True                    # Automatically search for best quality in least size
+    deep_mode: bool = False                      # Deep perceptual analysis (SSIM search & sampling, slower)
+    target_ssim: float = 0.92                    # Target perceptual similarity threshold (SSIM)
+    min_ssim_threshold: float = 0.88             # Minimum perceptual quality guardrail
     overwrite_existing: bool = False             # If true, overwrite existing files instead of appending _1, _2
     preserve_metadata: bool = True
     preserve_timestamps: bool = True
@@ -70,6 +74,9 @@ class OptimizerConfig:
     video_extensions: Set[str] = field(default_factory=lambda: {
         ".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".3gp", ".flv"
     })
+
+    def get_config_hash(self) -> str:
+        return get_config_hash(self)
 
 
 def detect_hardware() -> HardwareProfile:
@@ -142,11 +149,12 @@ import json
 
 USER_CONFIG_PATH = Path.home() / ".media_optimizer.json"
 
-def load_user_config(config: OptimizerConfig) -> None:
+def load_user_config(config: OptimizerConfig, config_path: Optional[Path] = None) -> None:
     """Load user settings from file and apply them to config."""
-    if USER_CONFIG_PATH.exists():
+    path = config_path or USER_CONFIG_PATH
+    if path.exists():
         try:
-            with open(USER_CONFIG_PATH, "r") as f:
+            with open(path, "r") as f:
                 user_data = json.load(f)
             for k, v in user_data.items():
                 if hasattr(config, k):
@@ -154,10 +162,12 @@ def load_user_config(config: OptimizerConfig) -> None:
         except Exception as e:
             print(f"Failed to load user config: {e}")
 
-def save_user_config(config: OptimizerConfig) -> None:
+def save_user_config(config: OptimizerConfig, config_path: Optional[Path] = None) -> None:
     """Save user settings to file."""
     # List of keys we allow users to customize
     user_keys = [
+        "auto_quality",
+        "deep_mode",
         "convert_heic_to_jpeg",
         "overwrite_existing",
         "preserve_metadata",
@@ -168,7 +178,8 @@ def save_user_config(config: OptimizerConfig) -> None:
     ]
     try:
         user_data = {k: getattr(config, k) for k in user_keys if hasattr(config, k)}
-        with open(USER_CONFIG_PATH, "w") as f:
+        path = config_path or USER_CONFIG_PATH
+        with open(path, "w") as f:
             json.dump(user_data, f, indent=2)
     except Exception as e:
         print(f"Failed to save user config: {e}")
@@ -177,6 +188,8 @@ import hashlib
 def get_config_hash(config: OptimizerConfig) -> str:
     """Generate a hash representing the user-configurable optimization parameters."""
     keys = [
+        "auto_quality",
+        "deep_mode",
         "convert_heic_to_jpeg",
         "preserve_metadata",
         "jpeg_quality",

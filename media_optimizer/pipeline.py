@@ -231,7 +231,7 @@ class OptimizationPipeline:
         batch_opt_bytes = 0
 
         for t in tasks:
-            done_info = journal.is_already_done(t, config_hash, output_dir)
+            done_info = journal.is_already_done(t, config_hash, output_dir, deep_mode=self.config.deep_mode)
             if done_info is not None:
                 status, o_sz, opt_sz = done_info
                 skipped_already_done += 1
@@ -281,6 +281,8 @@ class OptimizationPipeline:
         current_failed = 0
         current_orig_bytes = batch_orig_bytes
         current_opt_bytes = batch_opt_bytes
+        current_res_saved = 0
+        current_codec_saved = 0
         counter_lock = threading.Lock()
         
         active_files: set = set()
@@ -289,6 +291,7 @@ class OptimizationPipeline:
         def _process_task(task: TaskItem) -> None:
             nonlocal processed_counter, current_orig_bytes, current_opt_bytes
             nonlocal current_completed, current_skipped, current_failed
+            nonlocal current_res_saved, current_codec_saved
             
             if self._stop_requested.is_set():
                 return
@@ -394,19 +397,19 @@ class OptimizationPipeline:
                 # 3. Record in journal
                 if success:
                     if plan and plan.action == DecisionAction.OPTIMIZE and final_sz < orig_sz:
-                        journal.record_completed(rel_p, orig_sz, final_sz, mtime, msg, config_hash, str(task.src_path.resolve()))
+                        journal.record_completed(rel_p, orig_sz, final_sz, mtime, msg, config_hash, str(task.src_path.resolve()), deep_mode=self.config.deep_mode)
                         act_level = "saved"
                     else:
-                        journal.record_skipped(rel_p, orig_sz, mtime, msg, config_hash, str(task.src_path.resolve()))
+                        journal.record_skipped(rel_p, orig_sz, mtime, msg, config_hash, str(task.src_path.resolve()), deep_mode=self.config.deep_mode)
                         act_level = "copied"
                 else:
-                    journal.record_failed(rel_p, orig_sz, mtime, msg, config_hash, str(task.src_path.resolve()))
+                    journal.record_failed(rel_p, orig_sz, mtime, msg, config_hash, str(task.src_path.resolve()), deep_mode=self.config.deep_mode)
                     act_level = "error"
 
             except Exception as e:
                 msg = f"Failed: {e}"
                 final_sz = orig_sz
-                journal.record_failed(rel_p, orig_sz, mtime, msg, config_hash, str(task.src_path.resolve()))
+                journal.record_failed(rel_p, orig_sz, mtime, msg, config_hash, str(task.src_path.resolve()), deep_mode=self.config.deep_mode)
                 act_level = "error"
 
             with active_lock:
@@ -422,6 +425,20 @@ class OptimizationPipeline:
                 
                 if act_level == "saved":
                     current_completed += 1
+                    if self.config.deep_mode:
+                        saved_item = max(0, orig_sz - final_sz)
+                        orig_w = plan.extra_params.get("orig_width") if plan else None
+                        orig_h = plan.extra_params.get("orig_height") if plan else None
+                        tgt_w = plan.target_width if plan else None
+                        tgt_h = plan.target_height if plan else None
+                        if orig_w and orig_h and tgt_w and tgt_h and (tgt_w < orig_w or tgt_h < orig_h):
+                            ratio = max(0.0, 1.0 - ((tgt_w * tgt_h) / (orig_w * orig_h)))
+                            r_part = int(saved_item * ratio)
+                            c_part = saved_item - r_part
+                            current_res_saved += r_part
+                            current_codec_saved += c_part
+                        else:
+                            current_codec_saved += saved_item
                 elif act_level == "copied":
                     current_skipped += 1
                 elif act_level == "error":
@@ -487,6 +504,10 @@ class OptimizationPipeline:
         finally:
             image_executor.shutdown(wait=True)
             video_executor.shutdown(wait=True)
+            
+            # Shut down background metadata daemon to free system resources
+            from media_optimizer.core.metadata import shutdown_exiftool
+            shutdown_exiftool()
 
         from media_optimizer.core.journal import BatchSummary
         saved = max(0, current_orig_bytes - current_opt_bytes)
@@ -500,6 +521,8 @@ class OptimizationPipeline:
             optimized_bytes=current_opt_bytes,
             saved_bytes=saved,
             reduction_percent=pct,
+            res_saved_bytes=current_res_saved,
+            codec_saved_bytes=current_codec_saved,
         )
         emit_activity(
             f"Batch completed! Processed: {final_summary.completed} optimized, {final_summary.skipped} preserved, {final_summary.failed} failed. Space saved: {format_bytes(final_summary.saved_bytes)} ({final_summary.reduction_percent:.1f}% reduction).",

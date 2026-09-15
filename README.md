@@ -96,11 +96,17 @@ Media Optimizer runs natively on **macOS Monterey (12.0) or later** (optimized f
 brew install ffmpeg exiftool python@3.14
 ```
 
-### 2. Install Python Packages
+### 2. Verify Your Environment
+Run the built-in diagnostic checker to confirm your setup:
+```bash
+./run.sh --check
+```
+
+### 3. Install Python Packages
 ```bash
 pip3 install -r requirements.txt
 ```
-*(Only `Pillow` is required. All other components use Python standard library and macOS native frameworks).*
+*(Only `Pillow` is required. All other components use the Python standard library and macOS native frameworks).*
 
 ---
 
@@ -151,13 +157,26 @@ Both the Desktop GUI and Web GUI feature an interactive settings modal with inst
 
 | Setting | Default | Description |
 | :--- | :---: | :--- |
+| **Automatic Best Quality (Auto Mode)** | `Enabled` | Applies high-efficiency, single-pass fixed profiles identical to WhatsApp's processing. Extremely fast, lightweight, and mathematically tuned for mobile/laptop viewing. |
+| **Deep Perceptual Analysis (Deep Mode)** | `Disabled` | When enabled alongside Auto Mode, replaces the fixed profiles with a slow, mathematically optimal binary search. Uses local-window Structural Similarity (MSSIM) and dynamic rate-distortion sampling to find the absolute minimum bitrate/quality that preserves visual fidelity. |
 | **Convert HEIC to JPEG** | `Enabled` | Converts Apple HEIC photos to standard JPEG for cross-platform compatibility. Uncheck to preserve HEIC. |
 | **Overwrite Existing Files** | `Disabled` | When disabled, collisions append a numeric suffix (`_1`, `_2`) so both files are kept. When enabled, updates previous outputs cleanly. Originals are always protected. |
 | **Preserve Metadata** | `Enabled` | Retains full camera EXIF, GPS location, color profiles, and timestamps via ExifTool. |
-| **Image Quality** | `80` | Perceptual sweet-spot quality factor (1–100). WhatsApp uses 78–80 for maximum space saving with sharp detail. |
+| **Manual Image Quality** | `80` | Fallback compression quality (1–100) when auto quality is off. 80 is the WhatsApp perceptual sweet spot. |
 | **Max Image Dimension** | `2048 px` | Downscales camera photos exceeding this dimension on their longest edge (matches WhatsApp HD). |
 | **Max Video Height** | `1080 px` | Downscales 4K / UHD videos to 1080p, reducing file size by up to 85% with sharp visual fidelity. |
 | **Max Video FPS** | `30 fps` | Caps high-framerate (60fps) clips to 30fps to halve encoding overhead while maintaining smooth motion. |
+
+---
+
+## ⚡️ Dual-Mode Engine
+
+Media Optimizer 2.0 features a split-path architecture designed to respect both your time and your storage:
+
+1. **Fast Mode (WhatsApp Profile)**: The default behavior. Media is processed in a single pass using heuristic profiles optimized by billions of real-world WhatsApp messages. Driven by a persistent background **ExifTool Daemon**, Fast Mode can blitz through thousands of photos instantaneously by eliminating subprocess boot penalties.
+2. **Deep Mode (Perceptual Search)**: An opt-in feature for archivists. Iteratively transcodes media behind the scenes, mathematically measuring visual artifacts using 11x11 block-based SSIM. 
+   - **Video Reliability:** Uses hardware-accelerated **Multi-Point Sampling** (testing at 15%, 50%, and 85% timestamps) to ensure high-motion scenes maintain flawless quality.
+   - **HEIC Support:** Natively decodes Apple HEIC photos into memory to run rigorous perceptual math on them, guaranteeing absolute minimum file sizes.
 
 ---
 

@@ -11,6 +11,125 @@ from media_optimizer.core.analyzer import DecisionAction, OptimizationPlan
 from media_optimizer.core.metadata import copy_metadata, preserve_timestamps
 
 
+from media_optimizer.core.perceptual import compute_image_ssim, TARGET_SSIM_VIDEO
+from PIL import Image
+import tempfile
+
+
+def _sample_and_determine_optimal_video_bitrate(src: Path, plan: OptimizationPlan, config: OptimizerConfig, duration: float) -> Tuple[str, Optional[float]]:
+    """Extract short sample segments to dynamically find optimal rate-distortion bitrate (Deep Mode only)."""
+    base_bitrate_str = plan.target_video_bitrate or "2200k"
+    try:
+        base_kbps = int(base_bitrate_str.lower().replace("k", ""))
+    except Exception:
+        base_kbps = 2200
+
+    if duration < 6.0 or not config.auto_quality or not getattr(config, "deep_mode", False) or not config.hardware.ffmpeg_path:
+        return base_bitrate_str, None
+
+    ffmpeg = config.hardware.ffmpeg_path
+    vcodec = plan.target_video_codec or "hevc_videotoolbox"
+
+    # Generate 3 test points (15%, 50%, 85%) for robustness
+    sample_points = [duration * 0.15, duration * 0.50, duration * 0.85]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+
+        # Scaling filter if needed
+        filters = []
+        if plan.target_width and plan.target_height:
+            w = (plan.target_width // 2) * 2
+            h = (plan.target_height // 2) * 2
+            orig_w = plan.extra_params.get("orig_width")
+            orig_h = plan.extra_params.get("orig_height")
+            if orig_w is None or orig_h is None or (w != orig_w or h != orig_h):
+                scale_flags = getattr(config, "video_scale_flags", "bicubic")
+                filters.append(f"scale={w}:{h}:flags={scale_flags}")
+        vf_args = ["-vf", ",".join(filters)] if filters else []
+
+        def test_sample_bitrate(kbps: int) -> Tuple[bool, float]:
+            scores = []
+            for i, pt in enumerate(sample_points):
+                cand_clip = tmp_path / f"test_{kbps}_{i}.mp4"
+                
+                # 1. Encode 1-second candidate clip
+                enc_cmd = [
+                    ffmpeg, "-v", "error", "-y",
+                    "-ss", f"{pt:.2f}",
+                    "-t", "1.0",
+                    "-i", str(src),
+                ] + vf_args + [
+                    "-c:v", vcodec,
+                    "-b:v", f"{kbps}k",
+                    "-an",
+                    str(cand_clip),
+                ]
+                r = subprocess.run(enc_cmd, capture_output=True)
+                if r.returncode != 0 or not cand_clip.exists():
+                    continue
+
+                # 2. Use FFmpeg's native SSIM to compare candidate against source
+                ssim_log = tmp_path / f"ssim_{kbps}_{i}.log"
+                ssim_filter_str = f"ssim=stats_file={ssim_log}"
+                if filters:
+                    scale_str = ",".join(filters)
+                    ssim_filter_str = f"[0:v]{scale_str}[scaled_src];[scaled_src][1:v]{ssim_filter_str}"
+                else:
+                    ssim_filter_str = f"[0:v][1:v]{ssim_filter_str}"
+                
+                ssim_cmd = [
+                    ffmpeg, "-v", "error", "-y",
+                    "-ss", f"{pt:.2f}",
+                    "-t", "1.0",
+                    "-i", str(src),
+                    "-i", str(cand_clip),
+                    "-lavfi", ssim_filter_str,
+                    "-f", "null", "-"
+                ]
+                subprocess.run(ssim_cmd, capture_output=True)
+                
+                if ssim_log.exists():
+                    try:
+                        content = ssim_log.read_text()
+                        # Parse the last line's 'All:x.xxxx'
+                        lines = [line for line in content.splitlines() if line.strip()]
+                        if lines and "All:" in lines[-1]:
+                            score_str = lines[-1].split("All:")[1].split()[0]
+                            scores.append(float(score_str))
+                    except Exception:
+                        pass
+                
+            if not scores:
+                return False, 0.0
+            
+            # Use the worst frame score to guarantee quality across all sampled points
+            return True, min(scores)
+
+        # Binary rate search: test baseline, lower, and higher
+        target_ssim = TARGET_SSIM_VIDEO
+        ok_base, ssim_base = test_sample_bitrate(base_kbps)
+        if not ok_base:
+            return base_bitrate_str, None
+
+        if ssim_base >= target_ssim + 0.02:
+            # High fidelity: test lower bitrate (e.g. -35% bitrate) to save more storage
+            lower_kbps = max(800, int(base_kbps * 0.65))
+            ok_low, ssim_low = test_sample_bitrate(lower_kbps)
+            if ok_low and ssim_low >= target_ssim:
+                return f"{lower_kbps}k", ssim_low
+            return base_bitrate_str, ssim_base
+        elif ssim_base < target_ssim:
+            # Low fidelity: bump bitrate to ensure clean video without blocking
+            higher_kbps = int(base_kbps * 1.35)
+            ok_high, ssim_high = test_sample_bitrate(higher_kbps)
+            if ok_high and ssim_high > ssim_base:
+                return f"{higher_kbps}k", ssim_high
+            return base_bitrate_str, ssim_base
+
+        return base_bitrate_str, ssim_base
+
+
 def optimize_video(
     src: Path,
     dst: Path,
@@ -43,6 +162,12 @@ def optimize_video(
     hw_decode = config.prefer_hardware_encoder and config.hardware.has_hevc_videotoolbox
 
     try:
+        # Determine duration and dynamic perceptual bitrate sampling if deep_mode enabled
+        duration = float(plan.extra_params.get("duration", 0.0))
+        calibrated_bitrate, sampled_ssim = _sample_and_determine_optimal_video_bitrate(
+            src, plan, config, duration
+        )
+
         # Build FFmpeg command
         cmd = [
             config.hardware.ffmpeg_path,
@@ -80,7 +205,7 @@ def optimize_video(
         cmd.extend(["-c:v", vcodec])
 
         if vcodec == "hevc_videotoolbox":
-            bitrate = plan.target_video_bitrate or "2200k"
+            bitrate = calibrated_bitrate or plan.target_video_bitrate or "2200k"
             cmd.extend([
                 "-b:v", bitrate,
                 "-prio_speed", "1",      # Prioritize encoding speed in VideoToolbox

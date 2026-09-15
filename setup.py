@@ -13,6 +13,8 @@ setup(
     python_requires=">=3.9",
     install_requires=[
         "pillow>=10.0.0",
-        "numpy>=1.20.0",
     ],
+    extras_require={
+        "benchmark": ["numpy>=1.20.0"],
+    },
 )

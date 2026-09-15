@@ -19,10 +19,19 @@ class BatchSummary:
     optimized_bytes: int
     saved_bytes: int
     reduction_percent: float
+    res_saved_bytes: int = 0
+    codec_saved_bytes: int = 0
 
     def format_report(self) -> str:
         """Format an informative summary report."""
         from media_optimizer.utils import format_bytes
+
+        breakdown = ""
+        if self.saved_bytes > 0 and (self.res_saved_bytes > 0 or self.codec_saved_bytes > 0):
+            breakdown = (
+                f"  ├─ Spatial Resizing: {format_bytes(self.res_saved_bytes)}\n"
+                f"  └─ Codec Efficiency: {format_bytes(self.codec_saved_bytes)}\n"
+            )
 
         return (
             f"----------------------------------------\n"
@@ -35,11 +44,37 @@ class BatchSummary:
             f"Original size:        {format_bytes(self.original_bytes)}\n"
             f"Optimized size:       {format_bytes(self.optimized_bytes)}\n"
             f"Space saved:          {format_bytes(self.saved_bytes)}\n"
+            f"{breakdown}"
             f"Reduction:            {self.reduction_percent:.1f}%\n"
             f"----------------------------------------"
         )
 
 
+
+
+import hashlib
+
+
+def compute_file_fingerprint(path: Path) -> str:
+    """Compute a fast content fingerprint using first 64KB and last 64KB (or full file if small)."""
+    try:
+        if not path.exists():
+            return ""
+        size = path.stat().st_size
+        if size == 0:
+            return "empty"
+        chunk = 64 * 1024
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            if size <= chunk * 2:
+                h.update(f.read())
+            else:
+                h.update(f.read(chunk))
+                f.seek(size - chunk)
+                h.update(f.read(chunk))
+        return h.hexdigest()[:32]
+    except Exception:
+        return ""
 
 
 class Journal:
@@ -76,17 +111,14 @@ class Journal:
                         updated_at REAL NOT NULL
                     );
                 """)
-                try:
-                    conn.execute("ALTER TABLE tasks ADD COLUMN config_hash TEXT DEFAULT ''")
-                except sqlite3.OperationalError:
-                    pass
-                try:
-                    conn.execute("ALTER TABLE tasks ADD COLUMN src_path TEXT DEFAULT ''")
-                except sqlite3.OperationalError:
-                    pass
+                for col in ("config_hash TEXT DEFAULT ''", "src_path TEXT DEFAULT ''", "fingerprint TEXT DEFAULT ''"):
+                    try:
+                        conn.execute(f"ALTER TABLE tasks ADD COLUMN {col}")
+                    except sqlite3.OperationalError:
+                        pass
                 conn.commit()
 
-    def is_already_done(self, task: Any, config_hash: str, output_dir: Optional[Path] = None) -> Optional[Tuple[str, int, int]]:
+    def is_already_done(self, task: Any, config_hash: str, output_dir: Optional[Path] = None, deep_mode: bool = False) -> Optional[Tuple[str, int, int]]:
         """Check if file has already been successfully processed with this config.
         Returns (status, orig_size, opt_size) if done, else None.
         """
@@ -98,12 +130,27 @@ class Journal:
             with self._get_connection() as conn:
                 cur = conn.cursor()
                 cur.execute(
-                    "SELECT status, rel_path, orig_size FROM tasks WHERE src_path = ? AND config_hash = ? ORDER BY updated_at DESC",
+                    "SELECT status, rel_path, orig_size, orig_mtime, fingerprint FROM tasks WHERE src_path = ? AND config_hash = ? ORDER BY updated_at DESC",
                     (src_path_str, config_hash)
                 )
                 rows = cur.fetchall()
-                for status, saved_rel_path, orig_size in rows:
+                for status, saved_rel_path, orig_size, orig_mtime, saved_fp in rows:
                     if status in ("COMPLETED", "SKIPPED"):
+                        # Invalidate cache if source file was modified or replaced
+                        task_sz = getattr(task, "size_bytes", None)
+                        task_mt = getattr(task, "mtime", None)
+                        if task_sz is not None and task_sz != orig_size:
+                            continue
+                        if task_mt is not None and orig_mtime is not None:
+                            if abs(task_mt - orig_mtime) > 1.0:
+                                continue
+
+                        # Invalidate cache if content fingerprint doesn't match (deep mode only)
+                        if deep_mode and saved_fp:
+                            current_fp = compute_file_fingerprint(task.src_path)
+                            if current_fp and current_fp != saved_fp:
+                                continue
+
                         dest_file = output_dir / saved_rel_path
                         if not dest_file.exists():
                             alt_mp4 = dest_file.with_suffix(".mp4")
@@ -127,34 +174,37 @@ class Journal:
                 cur.execute("SELECT 1 FROM tasks WHERE rel_path = ?", (rel_path,))
                 return cur.fetchone() is not None
 
-    def record_completed(self, rel_path: str, orig_size: int, opt_size: int, mtime: float, reason: str, config_hash: str, src_path: str) -> None:
+    def record_completed(self, rel_path: str, orig_size: int, opt_size: int, mtime: float, reason: str, config_hash: str, src_path: str, deep_mode: bool = False) -> None:
+        fp = compute_file_fingerprint(Path(src_path)) if deep_mode else ""
         with self._lock:
             with self._get_connection() as conn:
                 conn.execute("""
                     INSERT OR REPLACE INTO tasks 
-                    (rel_path, orig_size, opt_size, status, orig_mtime, reason, error_msg, updated_at, config_hash, src_path)
-                    VALUES (?, ?, ?, 'COMPLETED', ?, ?, NULL, ?, ?, ?)
-                """, (rel_path, orig_size, opt_size, mtime, reason, time.time(), config_hash, src_path))
+                    (rel_path, orig_size, opt_size, status, orig_mtime, reason, error_msg, updated_at, config_hash, src_path, fingerprint)
+                    VALUES (?, ?, ?, 'COMPLETED', ?, ?, NULL, ?, ?, ?, ?)
+                """, (rel_path, orig_size, opt_size, mtime, reason, time.time(), config_hash, src_path, fp))
                 conn.commit()
 
-    def record_skipped(self, rel_path: str, orig_size: int, mtime: float, reason: str, config_hash: str, src_path: str) -> None:
+    def record_skipped(self, rel_path: str, orig_size: int, mtime: float, reason: str, config_hash: str, src_path: str, deep_mode: bool = False) -> None:
+        fp = compute_file_fingerprint(Path(src_path)) if deep_mode else ""
         with self._lock:
             with self._get_connection() as conn:
                 conn.execute("""
                     INSERT OR REPLACE INTO tasks 
-                    (rel_path, orig_size, opt_size, status, orig_mtime, reason, error_msg, updated_at, config_hash, src_path)
-                    VALUES (?, ?, ?, 'SKIPPED', ?, ?, NULL, ?, ?, ?)
-                """, (rel_path, orig_size, orig_size, mtime, reason, time.time(), config_hash, src_path))
+                    (rel_path, orig_size, opt_size, status, orig_mtime, reason, error_msg, updated_at, config_hash, src_path, fingerprint)
+                    VALUES (?, ?, ?, 'SKIPPED', ?, ?, NULL, ?, ?, ?, ?)
+                """, (rel_path, orig_size, orig_size, mtime, reason, time.time(), config_hash, src_path, fp))
                 conn.commit()
 
-    def record_failed(self, rel_path: str, orig_size: int, mtime: float, error_msg: str, config_hash: str, src_path: str) -> None:
+    def record_failed(self, rel_path: str, orig_size: int, mtime: float, error_msg: str, config_hash: str, src_path: str, deep_mode: bool = False) -> None:
+        fp = compute_file_fingerprint(Path(src_path)) if deep_mode else ""
         with self._lock:
             with self._get_connection() as conn:
                 conn.execute("""
                     INSERT OR REPLACE INTO tasks 
-                    (rel_path, orig_size, opt_size, status, orig_mtime, reason, error_msg, updated_at, config_hash, src_path)
-                    VALUES (?, ?, 0, 'FAILED', ?, NULL, ?, ?, ?, ?)
-                """, (rel_path, orig_size, mtime, error_msg, time.time(), config_hash, src_path))
+                    (rel_path, orig_size, opt_size, status, orig_mtime, reason, error_msg, updated_at, config_hash, src_path, fingerprint)
+                    VALUES (?, ?, 0, 'FAILED', ?, NULL, ?, ?, ?, ?, ?)
+                """, (rel_path, orig_size, mtime, error_msg, time.time(), config_hash, src_path, fp))
                 conn.commit()
 
     def get_summary(self) -> BatchSummary:

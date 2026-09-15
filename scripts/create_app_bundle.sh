@@ -113,6 +113,14 @@ if [ -z "$PYTHON_BIN" ]; then
     PYTHON_BIN="$(which python3)"
 fi
 
+if [ -z "$PYTHON_BIN" ] || ! "$PYTHON_BIN" -c "import PIL" 2>/dev/null; then
+    if command -v osascript >/dev/null 2>&1; then
+        osascript -e 'display alert "Media Optimizer Setup Required" message "Media Optimizer requires Python with the Pillow library.\n\nPlease install dependencies in Terminal:\nbrew install ffmpeg exiftool python@3.14\npip3 install pillow" as critical'
+    fi
+    echo "Error: Python 3 with Pillow is required." >&2
+    exit 1
+fi
+
 # Log output when launched without terminal (e.g. double clicked in Finder)
 if [ ! -t 1 ]; then
     exec > /tmp/media_optimizer_app.log 2>&1

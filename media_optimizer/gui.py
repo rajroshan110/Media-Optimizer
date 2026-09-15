@@ -203,7 +203,7 @@ class MediaOptimizerApp:
         """Open a modal window for user settings."""
         top = tk.Toplevel(self.root)
         top.title("Optimization Settings")
-        top.geometry("460x460")
+        top.geometry("470x500")
         top.resizable(False, False)
         top.transient(self.root)
         top.grab_set()
@@ -242,13 +242,15 @@ class MediaOptimizerApp:
                               foreground="#ffffff" if sys.platform == "darwin" else "#000000",
                               relief=tk.SOLID, borderwidth=1,
                               font=("SF Pro Text", 11, "normal"),
-                              padx=8, pady=6)
+                              padx=8, pady=6, wraplength=350)
                 label.pack(ipadx=1)
 
         frame = ttk.Frame(top, padding="20 20 20 20")
         frame.pack(fill=tk.BOTH, expand=True)
 
         # Variables
+        var_auto_q = tk.BooleanVar(value=getattr(self.config, "auto_quality", True))
+        var_deep = tk.BooleanVar(value=getattr(self.config, "deep_mode", False))
         var_heic = tk.BooleanVar(value=self.config.convert_heic_to_jpeg)
         var_ow = tk.BooleanVar(value=self.config.overwrite_existing)
         var_meta = tk.BooleanVar(value=self.config.preserve_metadata)
@@ -257,16 +259,21 @@ class MediaOptimizerApp:
         var_vid_h = tk.IntVar(value=self.config.video_max_height)
         var_vid_fps = tk.IntVar(value=self.config.video_max_fps)
 
-        def add_row(parent, row, text, var, tooltip, is_check=False):
+        manual_widgets = []
+
+        def add_row(parent, row, text, var, tooltip, is_check=False, is_manual=False):
             lbl_frame = ttk.Frame(parent)
             lbl_frame.grid(row=row, column=0, sticky=tk.W, pady=8)
             
+            chk_widget = None
             if is_check:
-                chk = ttk.Checkbutton(lbl_frame, text=text, variable=var)
-                chk.pack(side=tk.LEFT)
+                chk_widget = ttk.Checkbutton(lbl_frame, text=text, variable=var)
+                chk_widget.pack(side=tk.LEFT)
             else:
                 lbl = ttk.Label(lbl_frame, text=text)
                 lbl.pack(side=tk.LEFT)
+                if is_manual:
+                    manual_widgets.append(lbl)
             
             info = ttk.Label(lbl_frame, text=" ⓘ", foreground="#0a84ff", cursor="hand2", font=("SF Pro Text", 13))
             info.pack(side=tk.LEFT, padx=(4, 0))
@@ -275,24 +282,47 @@ class MediaOptimizerApp:
             if not is_check:
                 ent = ttk.Entry(parent, textvariable=var, width=10)
                 ent.grid(row=row, column=1, sticky=tk.E, pady=8)
+                if is_manual:
+                    manual_widgets.append(ent)
+            return chk_widget
 
         row = 0
+        add_row(frame, row, "Automatic Best Quality (Autonomous)", var_auto_q, "Completely autonomous: Media Optimizer inspects each file's entropy and visual structure to automatically select the optimal rate-distortion quality and resolution for least storage and pristine visual quality.\n\nUncheck to manually enforce fixed constraints below.", is_check=True)
+        row += 1
+        self.chk_deep = add_row(frame, row, "Deep Perceptual Analysis (Slow)", var_deep, "When enabled, performs local-window SSIM binary search and video bitrate sampling for mathematically optimal compression. Slower.\n\nLeave off for WhatsApp-fast single-pass processing.", is_check=True)
+        row += 1
         add_row(frame, row, "Convert HEIC to JPEG", var_heic, "Converts Apple HEIC photos to standard JPEG for universal compatibility.\nUncheck to keep original format.", is_check=True)
         row += 1
         add_row(frame, row, "Overwrite Existing Files", var_ow, "When re-processing files, overwrite the existing optimized file instead of adding a suffix like _1.", is_check=True)
         row += 1
         add_row(frame, row, "Preserve Metadata (EXIF/GPS)", var_meta, "Keeps hidden data like date taken and GPS location.\nUncheck to strip data and save a few kilobytes.", is_check=True)
         row += 1
-        add_row(frame, row, "Image Quality (1-100):", var_img_q, "Compression level. 80 is the WhatsApp sweet spot.\nLower = smaller file but blurrier.")
+        add_row(frame, row, "Manual Image Quality (1-100):", var_img_q, "Fallback compression level when auto quality is off. 80 is the sweet spot.\nLower = smaller file but blurrier.", is_manual=True)
         row += 1
-        add_row(frame, row, "Max Image Dimension (px):", var_img_max, "Resizes huge photos down to this size on their longest edge.\n2048px is WhatsApp HD quality.")
+        add_row(frame, row, "Max Image Dimension (px):", var_img_max, "Resizes huge photos down to this size on their longest edge.\n2048px is WhatsApp HD quality.", is_manual=True)
         row += 1
-        add_row(frame, row, "Max Video Height (px):", var_vid_h, "Resizes 4K/UHD videos down to this height (e.g., 1080 for 1080p).\nSaves massive space.")
+        add_row(frame, row, "Max Video Height (px):", var_vid_h, "Resizes 4K/UHD videos down to this height (e.g., 1080 for 1080p).\nSaves massive space.", is_manual=True)
         row += 1
-        add_row(frame, row, "Max Video FPS:", var_vid_fps, "Drops 60fps video down to 30fps.\n30fps cuts file size in half with normal motion.")
+        add_row(frame, row, "Max Video FPS:", var_vid_fps, "Drops 60fps video down to 30fps.\n30fps cuts file size in half with normal motion.", is_manual=True)
         row += 1
 
+        def _update_ui_state(*args):
+            is_auto = var_auto_q.get()
+            for w in manual_widgets:
+                try:
+                    w.config(state=tk.DISABLED if is_auto else tk.NORMAL)
+                except Exception:
+                    pass
+            # Deep Mode requires Auto Quality to be enabled
+            if hasattr(self, "chk_deep"):
+                self.chk_deep.config(state=tk.NORMAL if is_auto else tk.DISABLED)
+
+        var_auto_q.trace_add("write", _update_ui_state)
+        _update_ui_state()
+
         def _save():
+            self.config.auto_quality = var_auto_q.get()
+            self.config.deep_mode = var_deep.get()
             self.config.convert_heic_to_jpeg = var_heic.get()
             self.config.overwrite_existing = var_ow.get()
             self.config.preserve_metadata = var_meta.get()
@@ -309,6 +339,8 @@ class MediaOptimizerApp:
             messagebox.showinfo("Settings Saved", "Configuration has been updated and saved to disk.", parent=self.root)
 
         def _reset():
+            var_auto_q.set(True)
+            var_deep.set(False)
             var_heic.set(True)
             var_ow.set(False)
             var_meta.set(True)
@@ -316,6 +348,7 @@ class MediaOptimizerApp:
             var_img_max.set(2048)
             var_vid_h.set(1080)
             var_vid_fps.set(30)
+            _update_ui_state()
 
         btn_box = ttk.Frame(frame)
         btn_box.grid(row=row, column=0, columnspan=2, pady=(20, 0))

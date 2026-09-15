@@ -257,7 +257,11 @@ def analyze_image(path: Path, config: OptimizerConfig) -> Tuple[Optional[ImageIn
         target_width=target_w,
         target_height=target_h,
         target_quality=config.jpeg_quality,
-        extra_params={"preserve_exif": True},
+        extra_params={
+            "preserve_exif": True,
+            "orig_width": width,
+            "orig_height": height,
+        },
     )
 
 
@@ -435,8 +439,15 @@ def analyze_video(path: Path, config: OptimizerConfig) -> Tuple[Optional[VideoIn
     else:
         base_target_bitrate_kbps = 700.0   # SD / 480p
 
-    # Target ~30% reduction from source, bounded between 250k and base_target_bitrate_kbps
-    if video_bitrate_kbps > 0:
+    # Target bitrate calculation: dynamic rate-distortion when auto_quality is enabled, else heuristic baseline
+    if getattr(config, "auto_quality", True) and video_bitrate_kbps > 0:
+        out_fps = target_fps or fps
+        pixels_per_sec = target_w * target_h * out_fps
+        complexity = min(1.35, max(0.65, bppf / 0.10)) if bppf > 0 else 1.0
+        adaptive_kbps = (pixels_per_sec * 0.040 * complexity) / 1000.0
+        target_bitrate_kbps = min(base_target_bitrate_kbps * 1.25, max(280.0, adaptive_kbps))
+        target_bitrate_kbps = min(target_bitrate_kbps, video_bitrate_kbps * 0.70)
+    elif video_bitrate_kbps > 0:
         target_bitrate_kbps = min(base_target_bitrate_kbps, max(250.0, video_bitrate_kbps * 0.70))
     else:
         target_bitrate_kbps = base_target_bitrate_kbps
@@ -492,6 +503,7 @@ def analyze_video(path: Path, config: OptimizerConfig) -> Tuple[Optional[VideoIn
             "orig_width": width,
             "orig_height": height,
             "orig_fps": fps,
+            "duration": duration_sec,
         },
     )
 

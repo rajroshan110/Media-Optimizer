@@ -63,6 +63,10 @@ if [ -z "$PYTHON_BIN" ] || ! "$PYTHON_BIN" -c "import PIL" 2>/dev/null; then
     exit 1
 fi
 
+if [ "$1" = "--check" ] || [ "$1" = "-c" ]; then
+    exec "$PYTHON_BIN" -m media_optimizer.env_check
+fi
+
 if [ "$(uname -m)" = "arm64" ] && command -v arch >/dev/null 2>&1; then
     exec arch -arm64 "$PYTHON_BIN" -m media_optimizer.cli "$@"
 else
