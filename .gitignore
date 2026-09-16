@@ -42,3 +42,6 @@ demo_media_optimized/
 
 # macOS App Bundle (build artifact generated via scripts/create_app_bundle.sh)
 Media Optimizer.app/
+
+# Agent Logs & Docs
+.agent_docs/

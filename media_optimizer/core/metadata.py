@@ -134,9 +134,14 @@ class ExifToolDaemon:
                     self.proc.stdin.flush()
                     self.proc.wait(timeout=2)
                 except Exception:
-                    pass
+                    self.proc.kill()
+                    self.proc.wait(timeout=1)
+                finally:
+                    if self.proc.stdin:
+                        self.proc.stdin.close()
+                    if self.proc.stdout:
+                        self.proc.stdout.close()
                 self.proc = None
-
 import atexit
 
 def shutdown_exiftool() -> None:
