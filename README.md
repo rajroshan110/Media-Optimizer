@@ -1,9 +1,12 @@
 <div align="center">
 
+<img src="assets/icon.png" width="110" height="110" alt="Media Optimizer Icon" style="border-radius: 24px;" /><br><br>
+
 # ⚡️ Media Optimizer
 
 ### High-Speed Local Media Compression Engine for macOS (Apple Silicon)
 
+[![Download App](https://img.shields.io/github/v/release/rajroshan110/Media-Optimizer?style=for-the-badge&color=007AFF&label=Download%20macOS%20App)](https://github.com/rajroshan110/Media-Optimizer/releases/latest)
 [![Platform: macOS](https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-000000?style=for-the-badge&logo=apple&logoColor=white)](https://apple.com)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Hardware: VideoToolbox](https://img.shields.io/badge/Hardware%20Accel-VideoToolbox%20(HEVC)-orange?style=for-the-badge)](https://developer.apple.com/documentation/videotoolbox)
@@ -112,12 +115,21 @@ pip3 install -r requirements.txt
 
 ## 🚀 Quick Start
 
-### Option 1: Native macOS GUI
+### 📥 1-Click Install: Standalone macOS App (Recommended)
+1. Download **`Media-Optimizer-1.0.0-macOS.zip`** from [**Latest Releases**](https://github.com/rajroshan110/Media-Optimizer/releases/latest).
+2. Unzip and drag `Media Optimizer.app` into your `/Applications` folder.
+3. Double-click to launch!
+   > **Note for macOS Gatekeeper:** Because Media Optimizer is a free, open-source community app without a paid Apple developer certificate, macOS may show a developer verification notice on first launch. To launch it, either **Right-Click → Open → Click Open**, or run this one-line command in Terminal:
+   > ```bash
+   > xattr -cr "/Applications/Media Optimizer.app"
+   > ```
+
+### Option 1: Native macOS GUI (From Source)
 Launch directly using the native runner:
 ```bash
 ./run.sh --gui
 ```
-> Or generate a standalone native macOS `.app` bundle:
+> Or generate a fresh local native macOS `.app` bundle:
 > ```bash
 > ./scripts/create_app_bundle.sh
 > open "Media Optimizer.app"
