@@ -163,7 +163,11 @@ jobs:
               core.info(`Generated ${lines.length} commit entries${previousTag ? ` from ${previousTag}` : ''}.`);
             }
 
-      - name: Install dependencies & run tests
+      - name: Install system tools (FFmpeg & ExifTool)
+        run: |
+          brew install ffmpeg exiftool
+
+      - name: Install Python dependencies & run tests
         run: |
           pip install -r requirements.txt
           python3 -m unittest discover tests
