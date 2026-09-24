@@ -1,0 +1,188 @@
+name: Build and publish release
+
+on:
+  push:
+    tags:
+      - "v*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release, for example v1.0.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build macOS App and create GitHub Release
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag && 'main' || github.ref }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate tag and app version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          ref_name="${{ inputs.tag || github.ref_name }}"
+          tag="${ref_name#v}"
+          if [[ ! "$tag" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?(-dev[0-9]+)?$ ]]; then
+            echo "Tag must look like v1.0, v1.0.0, or v1.0.0-dev1" >&2
+            exit 1
+          fi
+
+          configured_version="$(sed -n 's/^[[:space:]]*version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' pyproject.toml | head -n 1)"
+          if [[ "$configured_version" != "$tag" ]]; then
+            echo "Tag $tag does not match version $configured_version in pyproject.toml" >&2
+            exit 1
+          fi
+
+          echo "name=$tag" >> "$GITHUB_OUTPUT"
+          if [[ "$tag" == *-dev* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate release notes from commits
+        id: notes
+        uses: actions/github-script@v7
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        with:
+          script: |
+            const fs = require('fs');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const currentTag = process.env.RELEASE_TAG;
+
+            function parseTag(tag) {
+              const match = tag.match(/^v(\d+)\.(\d+)(?:\.(\d+))?(?:-dev(\d+))?$/);
+              if (!match) return null;
+              return {
+                tag,
+                major: Number(match[1]),
+                minor: Number(match[2]),
+                patch: Number(match[3] || 0),
+                dev: match[4] == null ? null : Number(match[4]),
+              };
+            }
+
+            function compareBase(a, b) {
+              return (a.major - b.major) || (a.minor - b.minor) || (a.patch - b.patch);
+            }
+
+            const current = parseTag(currentTag);
+            if (!current) core.setFailed(`Unsupported release tag: ${currentTag}`);
+            else {
+              const tags = await github.paginate(github.rest.repos.listTags, {
+                owner, repo, per_page: 100,
+              });
+              const parsed = tags.map(item => parseTag(item.name)).filter(Boolean);
+
+              let candidates;
+              if (current.dev !== null) {
+                candidates = parsed.filter(item =>
+                  item.tag !== currentTag &&
+                  item.dev !== null &&
+                  compareBase(item, current) === 0 &&
+                  item.dev < current.dev
+                );
+                if (candidates.length === 0) {
+                  candidates = parsed.filter(item =>
+                    item.tag !== currentTag &&
+                    item.dev === null &&
+                    compareBase(item, current) <= 0
+                  );
+                }
+              } else {
+                candidates = parsed.filter(item =>
+                  item.tag !== currentTag &&
+                  item.dev === null &&
+                  compareBase(item, current) < 0
+                );
+              }
+
+              candidates.sort((a, b) => {
+                const baseOrder = compareBase(b, a);
+                if (baseOrder !== 0) return baseOrder;
+                return (b.dev ?? -1) - (a.dev ?? -1);
+              });
+              const previousTag = candidates[0]?.tag || null;
+
+              let commits;
+              if (previousTag) {
+                const comparison = await github.rest.repos.compareCommitsWithBasehead({
+                  owner, repo, basehead: `${previousTag}...${currentTag}`,
+                });
+                commits = comparison.data.commits;
+              } else {
+                commits = await github.paginate(github.rest.repos.listCommits, {
+                  owner, repo, sha: currentTag, per_page: 100,
+                });
+                commits = commits.reverse();
+              }
+
+              const lines = [];
+              for (const commit of commits) {
+                const message = (commit.commit?.message || '').split('\n')[0].trim();
+                if (!message) continue;
+                const author = commit.author?.login || commit.commit?.author?.name || 'unknown';
+                const authorText = author.startsWith('@') ? author : `@${author}`;
+                lines.push(`- ${message} by ${authorText} ([${commit.sha.slice(0, 7)}](${commit.html_url}))`);
+              }
+
+              const compareUrl = previousTag
+                ? `https://github.com/${owner}/${repo}/compare/${previousTag}...${currentTag}`
+                : `https://github.com/${owner}/${repo}/commits/${currentTag}`;
+              const heading = current.dev !== null ? '## Development Improvements' : '## Improvements';
+              const previousText = previousTag ? ` since ${previousTag}` : '';
+              const body = [
+                heading,
+                `Improvements in this release${previousText}:`,
+                '',
+                ...(lines.length ? lines : ['- Initial release of Media Optimizer.']),
+                '',
+                `**[Full Changelog](${compareUrl})**`,
+                '',
+              ].join('\n');
+
+              fs.writeFileSync('release-notes.md', body);
+              core.info(`Generated ${lines.length} commit entries${previousTag ? ` from ${previousTag}` : ''}.`);
+            }
+
+      - name: Install dependencies & run tests
+        run: |
+          pip install -r requirements.txt
+          python3 -m unittest discover tests
+
+      - name: Build macOS Application Bundle
+        run: |
+          chmod +x scripts/create_app_bundle.sh
+          ./scripts/create_app_bundle.sh
+          asset_name="Media-Optimizer-${{ steps.version.outputs.name }}-macOS.zip"
+          ditto -c -k --sequesterRsrc --keepParent "Media Optimizer.app" "$asset_name"
+          shasum -a 256 "$asset_name" > "${asset_name}.sha256"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: Media Optimizer ${{ steps.version.outputs.name }}
+          prerelease: ${{ steps.version.outputs.prerelease }}
+          body_path: release-notes.md
+          files: |
+            Media-Optimizer-${{ steps.version.outputs.name }}-macOS.zip
+            Media-Optimizer-${{ steps.version.outputs.name }}-macOS.zip.sha256
