@@ -30,6 +30,8 @@ cat <<EOF > "$APP_DIR/Contents/Info.plist"
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
     <string>1.0.0</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
     <key>NSHighResolutionCapable</key>
@@ -44,8 +46,14 @@ cat <<EOF > "$APP_DIR/Contents/Info.plist"
 </plist>
 EOF
 
-# Copy codebase into Resources for full portability
+# Copy codebase and assets into Resources for full portability
 cp -r "$ROOT_DIR/media_optimizer" "$APP_DIR/Contents/Resources/"
+if [ -d "$ROOT_DIR/assets" ]; then
+    cp -r "$ROOT_DIR/assets" "$APP_DIR/Contents/Resources/"
+    if [ -f "$ROOT_DIR/assets/AppIcon.icns" ]; then
+        cp "$ROOT_DIR/assets/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
+    fi
+fi
 
 # Create executable launcher script
 cat <<'EOF' > "$APP_DIR/Contents/MacOS/MediaOptimizer"

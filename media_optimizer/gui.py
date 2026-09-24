@@ -47,6 +47,9 @@ class MediaOptimizerApp:
             self.input_var.set(str(Path(initial_folder).resolve()))
             self._update_default_output()
 
+        # Set window icon if available
+        self._set_window_icon()
+
         # Lift and bring window to front
         self.root.after(100, self._bring_to_front)
 
@@ -64,6 +67,24 @@ class MediaOptimizerApp:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
+        except Exception:
+            pass
+
+    def _set_window_icon(self) -> None:
+        """Load and set app icon on the Tkinter window."""
+        try:
+            from PIL import ImageTk, Image
+            possible_paths = [
+                Path(__file__).parent / "assets" / "icon.png",
+                Path(__file__).parent.parent / "assets" / "icon.png",
+                Path(sys.executable).parent.parent / "Resources" / "assets" / "icon.png",
+            ]
+            for p in possible_paths:
+                if p.is_file():
+                    img = Image.open(p).resize((64, 64), Image.Resampling.LANCZOS)
+                    self._icon_img = ImageTk.PhotoImage(img)
+                    self.root.wm_iconphoto(True, self._icon_img)
+                    break
         except Exception:
             pass
 
@@ -90,8 +111,14 @@ class MediaOptimizerApp:
         sub_label = ttk.Label(lbl_frame, text=subtitle, font=("SF Pro Text", 11), foreground="#666666")
         sub_label.pack(anchor=tk.W)
 
-        settings_btn = ttk.Button(title_frame, text="⚙️ Settings", command=self._open_settings)
-        settings_btn.pack(side=tk.RIGHT, anchor=tk.N)
+        top_btn_frame = ttk.Frame(title_frame)
+        top_btn_frame.pack(side=tk.RIGHT, anchor=tk.N)
+
+        web_btn = ttk.Button(top_btn_frame, text="🌐 Web GUI", command=self._open_web_gui)
+        web_btn.pack(side=tk.LEFT, padx=(0, 6))
+
+        settings_btn = ttk.Button(top_btn_frame, text="⚙️ Settings", command=self._open_settings)
+        settings_btn.pack(side=tk.LEFT)
 
         # Media Selection Frame
         folders_frame = ttk.LabelFrame(main_frame, text="Select Media Source & Destination", padding="12 12 12 12")
@@ -198,6 +225,47 @@ class MediaOptimizerApp:
         self.log_text.tag_configure("error", foreground="#f87171")
         self.log_text.tag_configure("complete", foreground="#c084fc")
         self.log_text.tag_configure("info", foreground="#38bdf8")
+
+    def _open_web_gui(self) -> None:
+        """Launch or open the local Web GUI in the user's default browser."""
+        if getattr(self, "_web_server_url", None):
+            import webbrowser
+            webbrowser.open(self._web_server_url)
+            self._log_activity(f"Opened Web GUI in browser: {self._web_server_url}", "INFO")
+            return
+
+        import webbrowser
+        from http.server import HTTPServer
+        from media_optimizer.web_gui import find_free_port, OptimizerState, WebGUIRequestHandler
+
+        port = find_free_port()
+        self._web_server_url = f"http://127.0.0.1:{port}"
+
+        state = OptimizerState()
+        current_input = self.input_var.get().strip() if hasattr(self, "input_var") else ""
+        current_output = self.output_var.get().strip() if hasattr(self, "output_var") else ""
+
+        WebGUIRequestHandler.state = state
+        WebGUIRequestHandler.initial_input = current_input
+        WebGUIRequestHandler.initial_output = current_output
+
+        try:
+            server = HTTPServer(("127.0.0.1", port), WebGUIRequestHandler)
+            self._web_server = server
+
+            def serve():
+                try:
+                    server.serve_forever()
+                except Exception:
+                    pass
+
+            t = threading.Thread(target=serve, daemon=True)
+            t.start()
+
+            threading.Timer(0.4, lambda: webbrowser.open(self._web_server_url)).start()
+            self._log_activity(f"Launched Web GUI on {self._web_server_url}", "INFO")
+        except Exception as e:
+            self._log_activity(f"Failed to launch Web GUI: {e}", "ERROR")
 
     def _open_settings(self):
         """Open a modal window for user settings."""

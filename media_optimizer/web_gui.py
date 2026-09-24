@@ -106,6 +106,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Media Optimizer</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/favicon.png">
 <style>
   :root {
     --bg: #f5f5f7;
@@ -862,6 +865,21 @@ class WebGUIRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             html = HTML_TEMPLATE.replace("__INITIAL_INPUT__", self.initial_input).replace("__INITIAL_OUTPUT__", self.initial_output)
             self.wfile.write(html.encode("utf-8"))
+        elif self.path in ("/favicon.ico", "/favicon.png"):
+            from pathlib import Path
+            fn = "favicon.ico" if self.path == "/favicon.ico" else "favicon.png"
+            mime = "image/x-icon" if fn == "favicon.ico" else "image/png"
+            p = Path(__file__).parent / "assets" / fn
+            if not p.is_file():
+                p = Path(__file__).parent.parent / "assets" / fn
+            if p.is_file():
+                self.send_response(200)
+                self.send_header("Content-Type", mime)
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.end_headers()
+                self.wfile.write(p.read_bytes())
+                return
+            self.send_error(404, "Not Found")
         elif self.path == "/api/status":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
