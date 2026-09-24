@@ -60,8 +60,8 @@ if [ -z "$PYTHON_BIN" ]; then
 fi
 
 if [ -z "$PYTHON_BIN" ] || ! "$PYTHON_BIN" -c "import PIL" 2>/dev/null; then
-    echo "Error: Required dependency 'Pillow' is not installed." >&2
-    echo "Please install it with: pip3 install pillow" >&2
+    echo "Error: Required dependencies are not installed." >&2
+    echo "Please install with: pip3 install -r requirements.txt" >&2
     exit 1
 fi
 

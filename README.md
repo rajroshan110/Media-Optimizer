@@ -93,7 +93,7 @@ Media Optimizer runs natively on **macOS Monterey (12.0) or later** (optimized f
 
 ### 1. Install Dependencies via Homebrew
 ```bash
-brew install ffmpeg exiftool python@3.14
+brew install ffmpeg exiftool python
 ```
 
 ### 2. Verify Your Environment

@@ -96,9 +96,11 @@ FALLBACK_BIN=""
 
 for py in "${CANDIDATES[@]}"; do
     if [ -n "$py" ] && [ -x "$py" ]; then
-        if "$py" -c "import PIL, tkinter" 2>/dev/null; then
+        if "$py" -c "import PIL, tkinter, pillow_heif" 2>/dev/null; then
             PYTHON_BIN="$py"
             break
+        elif "$py" -c "import PIL, tkinter" 2>/dev/null && [ -z "$FALLBACK_BIN" ]; then
+            FALLBACK_BIN="$py"
         elif "$py" -c "import PIL" 2>/dev/null && [ -z "$FALLBACK_BIN" ]; then
             FALLBACK_BIN="$py"
         fi
@@ -115,7 +117,7 @@ fi
 
 if [ -z "$PYTHON_BIN" ] || ! "$PYTHON_BIN" -c "import PIL" 2>/dev/null; then
     if command -v osascript >/dev/null 2>&1; then
-        osascript -e 'display alert "Media Optimizer Setup Required" message "Media Optimizer requires Python with the Pillow library.\n\nPlease install dependencies in Terminal:\nbrew install ffmpeg exiftool python@3.14\npip3 install pillow" as critical'
+        osascript -e 'display alert "Media Optimizer Setup Required" message "Media Optimizer requires Python with Pillow and pillow-heif libraries.\n\nPlease install dependencies in Terminal:\nbrew install ffmpeg exiftool python\npip3 install -r requirements.txt" as critical'
     fi
     echo "Error: Python 3 with Pillow is required." >&2
     exit 1
