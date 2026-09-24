@@ -178,7 +178,6 @@ jobs:
           ./scripts/create_app_bundle.sh
           asset_name="Media-Optimizer-${{ steps.version.outputs.name }}-macOS.zip"
           ditto -c -k --sequesterRsrc --keepParent "Media Optimizer.app" "$asset_name"
-          shasum -a 256 "$asset_name" > "${asset_name}.sha256"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -187,6 +186,4 @@ jobs:
           name: Media Optimizer ${{ steps.version.outputs.name }}
           prerelease: ${{ steps.version.outputs.prerelease }}
           body_path: release-notes.md
-          files: |
-            Media-Optimizer-${{ steps.version.outputs.name }}-macOS.zip
-            Media-Optimizer-${{ steps.version.outputs.name }}-macOS.zip.sha256
+          files: Media-Optimizer-${{ steps.version.outputs.name }}-macOS.zip
