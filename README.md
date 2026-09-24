@@ -123,12 +123,22 @@ Launch directly using the native runner:
 > open "Media Optimizer.app"
 > ```
 
+<p align="center">
+  <img src="docs/screenshots/gui_main.png" alt="Native macOS GUI" width="48%" />
+  <img src="docs/screenshots/gui_settings.png" alt="macOS Optimization Settings" width="48%" />
+</p>
+
 ### Option 2: Local Web GUI
 Open in any modern browser:
 ```bash
 ./run.sh --web
 ```
 Access the interface at `http://localhost:8484`.
+
+<p align="center">
+  <img src="docs/screenshots/web_main.png" alt="Local Web GUI" width="48%" />
+  <img src="docs/screenshots/web_settings.png" alt="Web Optimization Settings" width="48%" />
+</p>
 
 ### Option 3: Terminal CLI
 
