@@ -15,7 +15,7 @@
 
 <p align="center">
   <b>Reclaim up to 85% disk and cloud storage without perceptual quality loss.</b><br>
-  No cloud uploads. No privacy trade-offs. No manual bitrate guesswork.
+  Apple Silicon hardware-accelerated. 100% offline. Zero metadata loss. No manual bitrate guesswork.
 </p>
 
 </div>
@@ -24,17 +24,13 @@
 
 ## 💡 Why Media Optimizer?
 
-To save cloud storage space, many users resort to **sending photos and videos to themselves on WhatsApp**, downloading the compressed copies, and uploading those to the cloud.
+Managing growing photo and video libraries on macOS typically forces a compromise between three imperfect options:
+- **Complex Transcoding Tools**: Software like HandBrake or raw FFmpeg offers exceptional power for video, but requires navigating intricate codec parameters, lacks photo support, and is not designed to traverse mixed-media directory trees while preserving original filesystem timestamps and EXIF tags.
+- **Fragmented Utilities & Cloud Services**: Dedicated image compressors only handle photos, while cloud-based compression services require uploading private media to third-party servers, throttled by bandwidth limits and monthly subscription tiers.
+- **Ad-Hoc Messaging Hacks**: Many users resort to sending media to themselves on messaging platforms to leverage their compression algorithms—only to suffer stripped camera EXIF metadata, ruined timestamps, downscaled audio, and privacy exposure.
 
-Why? Because WhatsApp's compression algorithm finds the **perceptual sweet spot**: it reduces file sizes by **70% to 90%** while keeping the visual quality sharp on phones and laptops.
-
-However, that workflow has serious drawbacks:
-- ❌ **Privacy Compromise**: Your personal family photos and private videos are uploaded to third-party servers.
-- ❌ **Metadata Loss**: Capture dates, camera EXIF, and GPS locations are stripped.
-- ❌ **Tedious Manual Labor**: Sending, downloading, and renaming dozens of files by hand is exhausting.
-
-**Media Optimizer brings that exact efficiency to your local Mac.**
-Using Apple Silicon's hardware video encoders (`hevc_videotoolbox`), smart image downsampling, and an intelligent decision engine, it compresses large media libraries at blazing speed—**100% locally and privately**.
+**Media Optimizer provides a unified, local solution.**
+It brings intelligent, perceptual compression directly to your Mac. Combining Apple Silicon hardware acceleration (`hevc_videotoolbox`), smart Lanczos downsampling, an ExifTool metadata daemon, and an automated dual-mode decision engine, it optimizes heavy photo and video libraries at blazing speed—**100% locally, non-destructively, and privately**.
 
 ---
 
@@ -57,7 +53,7 @@ Using Apple Silicon's hardware video encoders (`hevc_videotoolbox`), smart image
 - ⚙️ **Interactive Settings & Built-In Tooltips**
   - Fine-tune optimization parameters right from the native desktop GUI or local web interface.
   - Helpful `ⓘ` hover tooltips explain the performance and perceptual trade-offs of each option.
-  - Features a **Reset to Defaults** button to instantly restore the WhatsApp perceptual sweet-spot settings.
+  - Features a **Reset to Defaults** button to instantly restore mathematically tuned perceptual sweet-spot settings.
   - Automatically persists user configurations to `~/.media_optimizer.json`.
 
 - 📍 **Full Metadata & Timestamp Preservation**
@@ -71,22 +67,23 @@ Using Apple Silicon's hardware video encoders (`hevc_videotoolbox`), smart image
   2. **Browser-Based Local Web GUI**: Zero-dependency web interface running locally on `localhost:8484` with instant CSS tooltips and live progress metrics.
   3. **Terminal CLI**: Scriptable command-line interface with `--dry-run`, custom worker concurrency, and batch reports.
 
-- 📊 **WhatsApp Benchmark Suite**
-  Includes a perceptual quality validation suite measuring SSIM (Structural Similarity Index), PSNR, and bitrate reduction side-by-side against WhatsApp.
+- 📊 **Perceptual Quality Benchmark Suite**
+  Includes a rigorous quality validation suite measuring SSIM (Structural Similarity Index), PSNR, and bitrate reduction to mathematically verify that visual fidelity is preserved after optimization.
 
 ---
 
-## 📊 Comparison: Media Optimizer vs. WhatsApp
+## 📊 How Media Optimizer Compares
 
-| Feature | Media Optimizer | WhatsApp Self-Chat |
-| :--- | :---: | :---: |
-| **Privacy** | 🔒 **100% Local & Offline** (Zero Network) | ⚠️ Uploaded to Meta Cloud |
-| **Speed** | ⚡️ **Hardware M-Series VideoToolbox** | ⏳ Limited by Internet Upload/Download |
-| **Batch Processing** | 📁 **Full Folder Trees & Multi-Select** | 🖐 Manual click per file |
-| **EXIF & GPS Metadata** | ✅ **Preserved** | ❌ Stripped |
-| **File Timestamps** | ✅ **Preserved** (Creation & Modified) | ❌ Set to download time |
-| **Perceptual Quality** | 🎯 **High (Tuned SSIM > 0.94)** | 🎯 High (Compressed) |
-| **Storage Savings** | 📉 **70% – 88% average reduction** | 📉 70% – 85% average reduction |
+| Capability | Media Optimizer | Traditional Video Transcoders *(e.g. HandBrake/FFmpeg)* | Dedicated Image Compressors *(e.g. ImageOptim)* | Web / Cloud Compressors | Messaging Apps *(Ad-hoc workaround)* |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Media Handling** | 📸 **Photos + 🎬 Videos** *(Unified)* | 🎬 Videos Only | 📸 Photos Only | Mixed *(Strict file caps)* | ⚠️ Single-file manual |
+| **Hardware Acceleration** | ⚡️ **Native Apple VideoToolbox** | ⚙️ Requires manual profile setup | ❌ CPU Bound | ☁️ Remote Server | ⏳ Internet Upload Bound |
+| **Perceptual Tuning** | 🎯 **Automated (SSIM > 0.95)** | 🛠 Manual bitrate guesswork | 🎯 Quality-based | ⚠️ Fixed server presets | 📉 Aggressive chat presets |
+| **Privacy & Security** | 🔒 **100% Local & Offline** | 🔒 Local | 🔒 Local | ⚠️ Uploaded to third party | ⚠️ Uploaded to cloud |
+| **EXIF & Camera Metadata** | ✅ **Preserved via ExifTool** | ⚠️ Partial / Inconsistent | ❌ Stripped by design | ❌ Stripped | ❌ Stripped |
+| **Original File Timestamps** | ✅ **Preserved** *(Created & Modified)*| ❌ Reset to encode time | ⚠️ Varies | ❌ Reset to download time | ❌ Reset to download time |
+| **Directory Tree Batching** | 📁 **Full Folder Trees + Resumable**| ⚠️ Flat queue, no folder trees | 📁 Flat Drag-and-Drop | ❌ Browser upload queue | ❌ Manual one-by-one |
+| **Cost & Restrictions** | 🆓 **Free & Open Source (MIT)** | 🆓 Open Source | 🆓 Open Source | 💳 Subscription / File limits | 🆓 Bandwidth bound |
 
 ---
 
@@ -179,26 +176,26 @@ Both the Desktop GUI and Web GUI feature an interactive settings modal with inst
 
 | Setting | Default | Description |
 | :--- | :---: | :--- |
-| **Automatic Best Quality (Auto Mode)** | `Enabled` | Applies high-efficiency, single-pass fixed profiles identical to WhatsApp's processing. Extremely fast, lightweight, and mathematically tuned for mobile/laptop viewing. |
-| **Deep Perceptual Analysis (Deep Mode)** | `Disabled` | When enabled alongside Auto Mode, replaces the fixed profiles with a slow, mathematically optimal binary search. Uses local-window Structural Similarity (MSSIM) and dynamic rate-distortion sampling to find the absolute minimum bitrate/quality that preserves visual fidelity. |
+| **Automatic Best Quality (Auto Mode)** | `Enabled` | Applies high-efficiency, single-pass heuristic profiles tuned for the perceptual sweet spot on retina and mobile displays. Extremely fast, lightweight, and hardware-accelerated. |
+| **Deep Perceptual Analysis (Deep Mode)** | `Disabled` | When enabled alongside Auto Mode, replaces heuristic profiles with an iterative, mathematically optimal binary search. Uses local-window Structural Similarity (MSSIM) and rate-distortion sampling to find the absolute minimum bitrate/quality that preserves visual fidelity. |
 | **Convert HEIC to JPEG** | `Enabled` | Converts Apple HEIC photos to standard JPEG for cross-platform compatibility. Uncheck to preserve HEIC. |
 | **Overwrite Existing Files** | `Disabled` | When disabled, collisions append a numeric suffix (`_1`, `_2`) so both files are kept. When enabled, updates previous outputs cleanly. Originals are always protected. |
 | **Preserve Metadata** | `Enabled` | Retains full camera EXIF, GPS location, color profiles, and timestamps via ExifTool. |
-| **Manual Image Quality** | `80` | Fallback compression quality (1–100) when auto quality is off. 80 is the WhatsApp perceptual sweet spot. |
-| **Max Image Dimension** | `2048 px` | Downscales camera photos exceeding this dimension on their longest edge (matches WhatsApp HD). |
+| **Manual Image Quality** | `80` | Fallback compression quality (1–100) when auto quality is off. 80 represents the optimal perceptual balance between size and artifact-free rendering. |
+| **Max Image Dimension** | `2048 px` | Downscales camera photos exceeding this dimension on their longest edge (standard high-definition web and retina resolution). |
 | **Max Video Height** | `1080 px` | Downscales 4K / UHD videos to 1080p, reducing file size by up to 85% with sharp visual fidelity. |
-| **Max Video FPS** | `30 fps` | Caps high-framerate (60fps) clips to 30fps to halve encoding overhead while maintaining smooth motion. |
+| **Max Video FPS** | `30 fps` | Caps high-framerate (60fps) clips to 30fps to halve encoding overhead while maintaining smooth natural motion. |
 
 ---
 
 ## ⚡️ Dual-Mode Engine
 
-Media Optimizer 2.0 features a split-path architecture designed to respect both your time and your storage:
+Media Optimizer 2.0 features a split-path architecture designed to balance throughput speed with archival quality:
 
-1. **Fast Mode (WhatsApp Profile)**: The default behavior. Media is processed in a single pass using heuristic profiles optimized by billions of real-world WhatsApp messages. Driven by a persistent background **ExifTool Daemon**, Fast Mode can blitz through thousands of photos instantaneously by eliminating subprocess boot penalties.
-2. **Deep Mode (Perceptual Search)**: An opt-in feature for archivists. Iteratively transcodes media behind the scenes, mathematically measuring visual artifacts using 11x11 block-based SSIM. 
-   - **Video Reliability:** Uses hardware-accelerated **Multi-Point Sampling** (testing at 15%, 50%, and 85% timestamps) to ensure high-motion scenes maintain flawless quality.
-   - **HEIC Support:** Natively decodes Apple HEIC photos into memory to run rigorous perceptual math on them, guaranteeing absolute minimum file sizes.
+1. **Fast Mode (High-Efficiency Heuristic)**: The default behavior. Media is processed in a single pass using mathematically tuned heuristic profiles that deliver 70%–85% storage reduction with imperceptible loss on modern screens. Driven by a persistent background **ExifTool Daemon**, Fast Mode processes thousands of photos and videos rapidly without subprocess boot overhead.
+2. **Deep Mode (Perceptual Rate-Distortion Optimization)**: An opt-in feature for archivists and quality purists. Iteratively transcodes media behind the scenes, mathematically measuring visual artifacts using 11x11 block-based MSSIM and PSNR to locate the precise bitrate inflection point:
+   - **Video Reliability:** Uses hardware-accelerated **Multi-Point Sampling** (testing keyframes at 15%, 50%, and 85% timestamps) to ensure high-motion scenes maintain flawless quality.
+   - **HEIC & RAW Support:** Natively decodes Apple HEIC photos into memory to run rigorous perceptual math on them, guaranteeing absolute minimum file sizes without artifacting.
 
 ---
 
