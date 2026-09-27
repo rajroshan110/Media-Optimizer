@@ -118,7 +118,10 @@ class MediaOptimizerApp:
         web_btn.pack(side=tk.LEFT, padx=(0, 6))
 
         settings_btn = ttk.Button(top_btn_frame, text="⚙️ Settings", command=self._open_settings)
-        settings_btn.pack(side=tk.LEFT)
+        settings_btn.pack(side=tk.LEFT, padx=(0, 6))
+
+        about_btn = ttk.Button(top_btn_frame, text="ℹ️ About", command=self._open_about)
+        about_btn.pack(side=tk.LEFT)
 
         # Media Selection Frame
         folders_frame = ttk.LabelFrame(main_frame, text="Select Media Source & Destination", padding="12 12 12 12")
@@ -266,6 +269,66 @@ class MediaOptimizerApp:
             self._log_activity(f"Launched Web GUI on {self._web_server_url}", "INFO")
         except Exception as e:
             self._log_activity(f"Failed to launch Web GUI: {e}", "ERROR")
+
+    def _log_activity(self, msg: str, level: str = "info") -> None:
+        """Helper to log activity messages to GUI log window."""
+        self._on_activity(msg, level.lower())
+
+    def _open_about(self) -> None:
+        """Open an About and License modal window."""
+        top = tk.Toplevel(self.root)
+        top.title("About Media Optimizer")
+        top.geometry("490x440")
+        top.resizable(False, False)
+        top.transient(self.root)
+        top.grab_set()
+
+        frame = ttk.Frame(top, padding="20 20 20 20")
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        title = ttk.Label(frame, text="Media Optimizer", font=("SF Pro Display", 18, "bold"))
+        title.pack(anchor=tk.W, pady=(0, 2))
+
+        version = ttk.Label(frame, text="Version 1.0.0 • MIT License", font=("SF Pro Text", 11), foreground="#666666")
+        version.pack(anchor=tk.W, pady=(0, 12))
+
+        desc = (
+            "Automatic local media optimization engine for macOS (Apple Silicon).\n"
+            "Hardware-accelerated HEVC transcoding, intelligent JPEG compression,\n"
+            "and lossless EXIF/metadata preservation.\n\n"
+            "Copyright © 2026 Raj Roshan. Released under the MIT License."
+        )
+        desc_lbl = ttk.Label(frame, text=desc, font=("SF Pro Text", 11), justify=tk.LEFT)
+        desc_lbl.pack(anchor=tk.W, pady=(0, 12))
+
+        credits_frame = ttk.LabelFrame(frame, text="Third-Party Open-Source Credits", padding="10 10 10 10")
+        credits_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 14))
+
+        credits_text = (
+            "• FFmpeg: VideoToolbox hardware acceleration (LGPL 2.1+ / GPL)\n"
+            "• ExifTool: Metadata & timestamp preservation by Phil Harvey (Artistic/GPL)\n"
+            "• Pillow: Perceptual image downsampling & encoding (HPND License)\n"
+            "• pillow-heif: Native HEIC/HEIF decoding support (LGPL v3)"
+        )
+        credits_lbl = ttk.Label(credits_frame, text=credits_text, font=("SF Pro Text", 10), justify=tk.LEFT)
+        credits_lbl.pack(anchor=tk.W)
+
+        btn_row = ttk.Frame(frame)
+        btn_row.pack(fill=tk.X)
+
+        def open_docs_license():
+            import webbrowser
+            license_doc = Path(__file__).parent.parent / "docs" / "LICENSE.md"
+            if license_doc.is_file():
+                webbrowser.open(f"file://{license_doc.resolve()}")
+            else:
+                webbrowser.open("https://github.com/rajroshan110/Media-Optimizer/blob/main/docs/LICENSE.md")
+
+        view_lic_btn = ttk.Button(btn_row, text="📄 View Full License", command=open_docs_license)
+        view_lic_btn.pack(side=tk.LEFT)
+
+        close_btn = ttk.Button(btn_row, text="Close", command=top.destroy)
+        close_btn.pack(side=tk.RIGHT)
 
     def _open_settings(self):
         """Open a modal window for user settings."""

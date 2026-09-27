@@ -11,7 +11,7 @@
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Hardware: VideoToolbox](https://img.shields.io/badge/Hardware%20Accel-VideoToolbox%20(HEVC)-orange?style=for-the-badge)](https://developer.apple.com/documentation/videotoolbox)
 [![Offline: 100%](https://img.shields.io/badge/Privacy-100%25%20Offline%20%26%20Local-success?style=for-the-badge)](README.md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](docs/LICENSE.md)
 
 <p align="center">
   <b>Reclaim up to 85% disk and cloud storage without perceptual quality loss.</b><br>
@@ -276,6 +276,9 @@ python3 scripts/run_benchmark.py
 
 ---
 
-## 📄 License
+## 📄 License & Legal Notices
 
-Distributed under the **MIT License**. See `LICENSE` for more information.
+Media Optimizer is open-source software distributed under the **[MIT License](LICENSE)**.
+
+For full license terms, rights permissions, and third-party software acknowledgments (FFmpeg, ExifTool, Pillow), see **[docs/LICENSE.md](docs/LICENSE.md)**.
+

@@ -491,11 +491,43 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
 </div>
 
+<div id="aboutModal" class="modal-overlay">
+  <div class="modal-content" style="max-width: 520px;">
+    <div class="modal-header">
+      <div class="modal-title">About &amp; License</div>
+      <button class="close-btn" onclick="closeAbout()">&times;</button>
+    </div>
+    <div style="margin-bottom: 12px;">
+      <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: 600;">Media Optimizer v1.0.0</h3>
+      <p style="margin: 0; font-size: 12px; color: var(--subtext);">Copyright &copy; 2026 Raj Roshan. Released under the <strong>MIT License</strong>.</p>
+    </div>
+    <p style="font-size: 13px; line-height: 1.5; color: var(--text); margin-bottom: 14px;">
+      Hardware-accelerated perceptual compression engine for macOS (Apple Silicon). Optimizes high-resolution photo and video libraries locally with zero quality sacrifice and zero network activity.
+    </p>
+    <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 12px; line-height: 1.6; margin-bottom: 16px;">
+      <div style="font-weight: 600; margin-bottom: 4px;">Third-Party Open-Source Credits:</div>
+      <ul style="margin: 0; padding-left: 18px; color: var(--subtext);">
+        <li><strong style="color: var(--text);">FFmpeg</strong>: VideoToolbox hardware acceleration (LGPL 2.1+ / GPL)</li>
+        <li><strong style="color: var(--text);">ExifTool</strong>: Metadata preservation by Phil Harvey (Artistic/GPL)</li>
+        <li><strong style="color: var(--text);">Pillow</strong>: Image decoding &amp; perceptual downsampling (HPND)</li>
+        <li><strong style="color: var(--text);">pillow-heif</strong>: Native HEIC/HEIF decoding support (LGPL v3)</li>
+      </ul>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <a href="https://github.com/rajroshan110/Media-Optimizer/blob/main/docs/LICENSE.md" target="_blank" rel="noopener" style="font-size: 12px; color: var(--primary); text-decoration: none; font-weight: 500;">📄 View Full License Docs &rarr;</a>
+      <button class="btn-primary" onclick="closeAbout()">Close</button>
+    </div>
+  </div>
+</div>
+
 <div class="container">
   <div class="header">
     <h1>Media Optimizer</h1>
     <p>macOS Apple Silicon Hardware Accelerated | Smart Adaptive Quality</p>
-    <button class="btn-secondary" style="margin-top: 10px; font-size: 12px; padding: 6px 12px;" onclick="openSettings()">⚙️ Settings</button>
+    <div style="display: flex; gap: 8px; justify-content: center; margin-top: 10px;">
+      <button class="btn-secondary" style="font-size: 12px; padding: 6px 14px;" onclick="openSettings()">⚙️ Settings</button>
+      <button class="btn-secondary" style="font-size: 12px; padding: 6px 14px;" onclick="openAbout()">ℹ️ About &amp; License</button>
+    </div>
   </div>
 
   <div class="card">
@@ -558,6 +590,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <div class="log-container" id="logContainer">
       <div class="log-item" style="color: var(--subtext);">Waiting to start...</div>
     </div>
+  </div>
+
+  <div style="text-align: center; margin-top: 20px; margin-bottom: 24px; font-size: 12px; color: var(--subtext);">
+    Media Optimizer • Open source under the <a href="javascript:void(0)" onclick="openAbout()" style="color: var(--primary); text-decoration: none; font-weight: 500;">MIT License</a>
   </div>
 </div>
 
@@ -691,6 +727,21 @@ function updateAutoUI() {
 function closeSettings() {
   document.getElementById("settingsModal").style.display = "none";
 }
+
+function openAbout() {
+  document.getElementById("aboutModal").style.display = "flex";
+}
+
+function closeAbout() {
+  document.getElementById("aboutModal").style.display = "none";
+}
+
+window.addEventListener("click", function(event) {
+  const sm = document.getElementById("settingsModal");
+  const am = document.getElementById("aboutModal");
+  if (event.target === sm) closeSettings();
+  if (event.target === am) closeAbout();
+});
 
 function resetSettings() {
   document.getElementById("cfg-auto-q").checked = true;

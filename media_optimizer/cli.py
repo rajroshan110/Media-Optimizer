@@ -32,6 +32,39 @@ def run_dry_run(input_target: Path, config) -> None:
     print("Dry run complete. No files were modified.\n")
 
 
+LICENSE_TEXT = """==================================================
+           MEDIA OPTIMIZER - LEGAL & LICENSE
+==================================================
+Media Optimizer is released under the MIT License.
+Copyright (c) 2026 Raj Roshan
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Third-Party Open-Source Acknowledgments:
+  - FFmpeg:   LGPL 2.1+ / GPL (https://ffmpeg.org)
+  - ExifTool: Perl Artistic / GPL by Phil Harvey (https://exiftool.org)
+  - Pillow:   HPND License (https://python-pillow.org)
+
+For full details, view: docs/LICENSE.md
+=================================================="""
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Media Optimizer - Automatic macOS local media compressor for photos & videos."
@@ -41,10 +74,16 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Analyze media and display optimization plans without processing.")
     parser.add_argument("--gui", action="store_true", help="Launch graphical user interface.")
     parser.add_argument("--web", action="store_true", help="Launch local browser-based GUI interface.")
+    parser.add_argument("--license", action="store_true", help="Display software license and third-party notices.")
+    parser.add_argument("--version", action="version", version="Media Optimizer 1.0.0 (MIT License)")
     parser.add_argument("--image-workers", type=int, help="Override image worker threads.")
     parser.add_argument("--video-workers", type=int, help="Override concurrent video transcodings.")
 
     args = parser.parse_args()
+
+    if args.license:
+        print(LICENSE_TEXT)
+        return
 
     if args.web or args.gui or not args.input_path:
         from media_optimizer.gui import launch_gui
